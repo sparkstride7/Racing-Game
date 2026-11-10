@@ -1,0 +1,24 @@
+import './style.css';
+import { Game } from './core/Game';
+
+/** Entry point: builds the game, then waits for the player to tap "start". */
+async function main() {
+  // Stop iOS Safari from zooming or scrolling the page while playing.
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  let game: Game;
+  try {
+    game = new Game(document.getElementById('game')!);
+    await game.init();
+  } catch (error) {
+    console.error(error);
+    const prompt = document.getElementById('start-prompt');
+    if (prompt) prompt.textContent = 'Sorry, the game could not start on this device.';
+    return;
+  }
+  game.hud.waitForStart(game.isTouch, () => game.start());
+}
+
+main();

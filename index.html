@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover lets the game use the whole iPhone screen, around the notch. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f17" />
+    <!-- Lets the game run full-screen when added to the iPhone home screen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Racing Game" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Racing Game</title>
+  </head>
+  <body>
+    <!-- The 3D view is added here. -->
+    <div id="game"></div>
+
+    <!-- Speedometer -->
+    <div id="hud" hidden>
+      <div class="speedo">
+        <div class="speedo-row"><span id="speed-value">0</span><span class="unit">km/h</span></div>
+        <div class="speedo-track"><div id="speed-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- Touchscreen buttons (only shown on phones and tablets) -->
+    <div id="touch-controls" hidden>
+      <div class="cluster left">
+        <button class="pad steer" data-action="left" aria-label="Steer left">
+          <svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" /></svg>
+        </button>
+        <button class="pad steer" data-action="right" aria-label="Steer right">
+          <svg viewBox="0 0 24 24"><path d="m9 4 8 8-8 8" /></svg>
+        </button>
+      </div>
+      <div class="cluster right">
+        <button class="pad brake" data-action="brake" aria-label="Brake and reverse">
+          <span>BRAKE</span>
+        </button>
+        <button class="pad gas" data-action="gas" aria-label="Accelerate">
+          <span>GAS</span>
+        </button>
+      </div>
+      <button class="reset" data-reset aria-label="Reset car">
+        <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v5h5" /></svg>
+      </button>
+    </div>
+
+    <!-- Start screen -->
+    <div id="start-screen">
+      <div class="start-card">
+        <div class="start-top">
+          <div class="logo">
+            <span class="logo-mark"></span>
+            <h1>RACING<br /><em>GAME</em></h1>
+          </div>
+          <p class="subtitle">Test Drive · Prototype</p>
+        </div>
+        <div class="start-bottom">
+        <p id="start-prompt" class="prompt">Loading…</p>
+        <p id="help-keyboard" class="help">
+          <b>W / ↑</b> accelerate &nbsp; <b>S / ↓</b> brake &amp; reverse &nbsp; <b>A D / ← →</b> steer<br />
+          <b>Space</b> handbrake &nbsp; <b>R</b> reset car
+        </p>
+        <p id="help-touch" class="help" hidden>
+          Left thumb: steer · Right thumb: gas &amp; brake<br />
+          <span class="rotate-hint">Turn your phone sideways for the best view</span>
+        </p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
