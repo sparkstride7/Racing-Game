@@ -67,14 +67,15 @@ async function drive(page, seconds) {
 const angleDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 async function desktopTest(browser) {
-  console.log('\n— Desktop (keyboard) —');
+  console.log('\n— Desktop free drive (keyboard) —');
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } });
   await page.screenshot({ path: path.join(OUT, 'desktop-1-start-screen.png') });
+  check('main menu shows Race and Free drive', (await page.locator('#mode-race').isVisible()) && (await page.locator('#mode-free').isVisible()));
 
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('KeyF');
   await drive(page, 1.5);
   const s0 = await state(page);
-  check('game started', s0.started);
+  check('free drive started (alone, no opponents)', s0.started && s0.mode === 'free' && s0.race === null);
   check('car is resting on the ground', s0.position.y > 0.3 && s0.position.y < 1.0, `height ${s0.position.y.toFixed(2)} m`);
 
   await page.keyboard.down('ArrowUp');
@@ -122,7 +123,7 @@ async function desktopTest(browser) {
 async function circuitTest(browser) {
   console.log('\n— Circuit —');
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } });
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('KeyF');
   await drive(page, 1.5);
   const g = await state(page);
   check('car starts on the grid, on the asphalt', g.distanceFromCenter < 5, `${g.distanceFromCenter.toFixed(1)} m from the centre line`);
@@ -175,6 +176,86 @@ async function circuitTest(browser) {
   await context.close();
 }
 
+async function raceTest(browser) {
+  console.log('\n— Race (desktop) —');
+  // ?laps=2 keeps the test short; real races are 3 laps.
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
+  await page.keyboard.press('Enter');
+  await drive(page, 1.2);
+  let s = await state(page);
+  check('race mode started with 6 cars', s.mode === 'race' && s.race.cars.length === 6, `${s.race.cars.length} cars`);
+  check('countdown is showing', ['3', '2', '1'].includes(s.race.countdown), `shows "${s.race.countdown}"`);
+  await page.screenshot({ path: path.join(OUT, 'race-1-countdown.png') });
+  const gridGaps = [];
+  for (let i = 0; i < 6; i++)
+    for (let j = i + 1; j < 6; j++) gridGaps.push(Math.hypot(s.race.cars[i].x - s.race.cars[j].x, s.race.cars[i].z - s.race.cars[j].z));
+  check('all 6 cars on separate grid slots', Math.min(...gridGaps) > 5, `closest two cars ${Math.min(...gridGaps).toFixed(1)} m apart`);
+
+  // Holding the gas during the countdown must not move the car.
+  await page.keyboard.down('ArrowUp');
+  while ((await state(page)).race.time < -0.3) await sleep(40);
+  s = await state(page);
+  check('nobody moves before GO', s.race.cars.every((c) => c.speedKmh < 2), s.race.cars.map((c) => c.speedKmh.toFixed(0)).join(','));
+  while ((await state(page)).race.time < 0.05) await sleep(40);
+  const goText = await page.locator('#countdown').textContent();
+  await page.screenshot({ path: path.join(OUT, 'race-2-go.png') });
+  check('GO! is shown at the start', goText === 'GO!', `shows "${goText}"`);
+
+  await drive(page, 4);
+  s = await state(page);
+  await page.screenshot({ path: path.join(OUT, 'race-3-racing.png') });
+  const ai = s.race.cars.filter((c) => c.name !== 'You');
+  check('all 5 opponents are racing', ai.every((c) => c.speedKmh > 50), ai.map((c) => `${c.name} ${c.speedKmh.toFixed(0)}`).join(', '));
+  check('race position is shown (1st–6th)', s.race.position >= 1 && s.race.position <= 6, `P${s.race.position}`);
+  check('lap counter shows lap 1 of 2', s.race.lap === 1 && (await page.locator('#race-lap').textContent()) === '1');
+  check('running order lists all 6 drivers', (await page.locator('#standings li').count()) === 6);
+  console.log(`      per frame with 6 cars: ${s.drawCalls} draw calls, ${Math.round(s.triangles / 1000)}k triangles`);
+  check('6-car race stays within the iPhone performance budget', s.drawCalls < 400 && s.triangles < 600000);
+
+  // Jump to just before the finish line on the last lap and cross it.
+  await page.evaluate(() => window.__game.placeBeforeFinish(40));
+  await drive(page, 3.5);
+  s = await state(page);
+  await page.keyboard.up('ArrowUp');
+  check('crossing the line on the last lap finishes the race', s.race.phase === 'finished');
+  await sleep(400);
+  await page.screenshot({ path: path.join(OUT, 'race-4-results.png') });
+  check('results screen shows all 6 drivers', (await page.locator('#results').isVisible()) && (await page.locator('#results-body tr').count()) === 6);
+
+  await page.locator('#race-again').click();
+  await drive(page, 0.5);
+  s = await state(page);
+  check('"Race again" restarts with the countdown', s.race && s.race.phase === 'countdown' && s.race.cars.length === 6 && !(await page.locator('#results').isVisible()));
+
+  await page.locator('#menu-button').click();
+  await drive(page, 0.3);
+  await page.keyboard.press('KeyF');
+  await drive(page, 1);
+  s = await state(page);
+  check('back to free drive: opponents removed', s.mode === 'free' && s.race === null && !(await page.locator('#race-hud').isVisible()));
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
+}
+
+async function iphoneRaceTest(browser) {
+  console.log('\n— iPhone race (touch) —');
+  const { context, page, errors } = await openGame(browser, devices['iPhone 13 landscape']);
+  const cdp = await context.newCDPSession(page);
+  await page.locator('#mode-race').tap();
+  await drive(page, 1.2);
+  await page.screenshot({ path: path.join(OUT, 'iphone-5-race-countdown.png') });
+  check('race starts from the RACE button', (await state(page)).mode === 'race');
+  check('race panel and touch controls are visible', (await page.locator('#race-hud').isVisible()) && (await page.locator('#touch-controls').isVisible()));
+  while ((await state(page)).race.time < 0) await sleep(40);
+  await holdTouch(page, cdp, '[data-action="gas"]', 3000);
+  const s = await state(page);
+  await page.screenshot({ path: path.join(OUT, 'iphone-6-racing.png') });
+  const me = s.race.cars.find((c) => c.name === 'You');
+  check('GAS button drives in the race', me.speedKmh > 40, `${me.speedKmh.toFixed(0)} km/h`);
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
+}
+
 /** Holds a finger on a button for `ms` milliseconds using real touch events. */
 async function holdTouch(page, cdp, selector, ms) {
   const box = await page.locator(selector).boundingBox();
@@ -191,7 +272,7 @@ async function iphoneTest(browser) {
   const cdp = await context.newCDPSession(page);
   await page.screenshot({ path: path.join(OUT, 'iphone-1-start-screen.png') });
 
-  await page.locator('#start-screen').tap();
+  await page.locator('#mode-free').tap();
   await drive(page, 1.5);
   const s0 = await state(page);
   check('game started by tapping', s0.started);
@@ -237,7 +318,9 @@ async function iphoneTest(browser) {
   try {
     await desktopTest(browser);
     await circuitTest(browser);
+    await raceTest(browser);
     await iphoneTest(browser);
+    await iphoneRaceTest(browser);
   } finally {
     await browser.close();
     server.kill();

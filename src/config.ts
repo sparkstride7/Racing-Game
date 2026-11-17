@@ -97,3 +97,13 @@ export const TRACK = {
   barrierHeight: 1.0,
   barrierThickness: 0.6,
 };
+
+export const RACE = {
+  laps: 3,
+  /** The player's grid slot (0 = pole position, 5 = last). */
+  playerGridSlot: 3,
+  /** Seconds for each step of the 3, 2, 1 countdown. */
+  countdownStep: 1,
+  /** After the player finishes, the race ends when everyone finishes or after this many seconds. */
+  finishTimeout: 45,
+};

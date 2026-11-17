@@ -18,7 +18,7 @@ async function main() {
     if (prompt) prompt.textContent = 'Sorry, the game could not start on this device.';
     return;
   }
-  game.hud.waitForStart(game.isTouch, () => game.start());
+  game.showMenu();
 }
 
 main();

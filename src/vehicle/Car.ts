@@ -4,7 +4,7 @@ import type { DynamicRayCastVehicleController, RigidBody, World } from '@dimforg
 import { CAR } from '../config';
 import type { DriveControls } from '../input/Input';
 import { clamp, lerp, moveTowards } from '../utils/math';
-import { createCarModel, type CarModel, MODEL_GROUND_OFFSET } from './CarModel';
+import { createCarModel, type CarModel, type CarStyle, MODEL_GROUND_OFFSET, PLAYER_STYLE } from './CarModel';
 
 /** Wheel order used everywhere: front-left, front-right, rear-left, rear-right. */
 const WHEELS = [
@@ -45,7 +45,13 @@ export class Car {
   private readonly tmpVec = new THREE.Vector3();
   private readonly tmpQuat = new THREE.Quaternion();
 
-  constructor(world: World, paintColor = 0xe3262f) {
+  /**
+   * If set, called instead of the normal reset when the car is stuck upside down
+   * (a race uses this to put the car back on the track where it was, not on the grid).
+   */
+  onAutoReset: (() => void) | null = null;
+
+  constructor(world: World, style: CarStyle = PLAYER_STYLE) {
     // Physics body. Mass and balance are set by hand so we control the centre of mass.
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
       .setAdditionalMassProperties(
@@ -90,7 +96,7 @@ export class Car {
     });
 
     // 3D model. The body model sits lower than the physics origin (which is at axle height + suspension).
-    this.model = createCarModel(paintColor);
+    this.model = createCarModel(style);
     this.model.body.position.y = -MODEL_GROUND_OFFSET;
     this.object.add(this.model.body);
     this.model.wheels.forEach((wheel) => this.object.add(wheel.pivot));
@@ -101,6 +107,15 @@ export class Car {
     this.spawnPosition.copy(position);
     this.spawnRotation.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, heading);
     this.reset();
+  }
+
+  /** Moves the car to a spot (stopped), without changing where it resets to. */
+  placeAt(position: THREE.Vector3, heading: number) {
+    const savedPosition = this.spawnPosition.clone();
+    const savedRotation = this.spawnRotation.clone();
+    this.setSpawn(position, heading);
+    this.spawnPosition.copy(savedPosition);
+    this.spawnRotation.copy(savedRotation);
   }
 
   reset() {
@@ -188,12 +203,24 @@ export class Car {
     const down = CAR.downforce * speed * speed * dt;
     this.body.applyImpulse({ x: this.tmpVec.x * down, y: this.tmpVec.y * down, z: this.tmpVec.z * down }, true);
 
-    this.vehicle.updateVehicle(dt);
+    // Wheels only touch the ground and track, never other cars.
+    this.vehicle.updateVehicle(dt, RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC);
 
     // --- Auto-reset if the car stays on its side or roof. ---
     this.tmpVec.set(0, 1, 0).applyQuaternion(this.tmpQuat);
     this.upsideDownTime = this.tmpVec.y < 0.3 ? this.upsideDownTime + dt : 0;
-    if (this.upsideDownTime > 2 || this.body.translation().y < -20) this.reset();
+    if (this.upsideDownTime > 2 || this.body.translation().y < -20) {
+      if (this.onAutoReset) {
+        this.upsideDownTime = 0;
+        this.onAutoReset();
+      } else this.reset();
+    }
+  }
+
+  /** Removes the car from the physics world (its 3D object must be removed from the scene separately). */
+  dispose(world: World) {
+    world.removeVehicleController(this.vehicle);
+    world.removeRigidBody(this.body);
   }
 
   /** Called after each physics step. */

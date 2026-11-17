@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node tests/smoke.cjs"
+    "test:e2e": "node tests/smoke.cjs",
+    "test:race": "rolldown tests/sim/race-sim.ts --platform node --format esm --file test-results/race-sim.mjs --log-level warn && node test-results/race-sim.mjs",
+    "test": "npm run build && npm run test:race && npm run test:e2e"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",

@@ -25,6 +25,42 @@
       </div>
     </div>
 
+    <!-- Race information: position, lap, time and the running order -->
+    <div id="race-hud" hidden>
+      <div class="race-card">
+        <div class="race-position"><span id="race-pos">1</span><sup id="race-pos-suffix">st</sup><span class="of">/6</span></div>
+        <div class="race-meta">
+          <div class="race-lap">LAP <b id="race-lap">1</b>/<span id="race-laps">3</span></div>
+          <div class="race-time" id="race-time">0:00.0</div>
+        </div>
+      </div>
+      <ol id="standings" class="standings"></ol>
+    </div>
+
+    <!-- Big centre text: 3, 2, 1, GO! and "FINAL LAP" -->
+    <div id="countdown" aria-live="assertive"></div>
+
+    <!-- Back to the main menu (shown while driving) -->
+    <button id="menu-button" hidden aria-label="Main menu">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+    </button>
+
+    <!-- Race results -->
+    <div id="results" hidden>
+      <div class="results-card">
+        <p class="results-kicker">Greenfield Circuit · Race results</p>
+        <h2 id="results-title">You finished 1st!</h2>
+        <table class="results-table">
+          <thead><tr><th>Pos</th><th>Driver</th><th>Best lap</th><th>Time</th></tr></thead>
+          <tbody id="results-body"></tbody>
+        </table>
+        <div class="results-buttons">
+          <button id="race-again" class="btn primary">Race again</button>
+          <button id="results-menu" class="btn">Main menu</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Touchscreen buttons (only shown on phones and tablets) -->
     <div id="touch-controls" hidden>
       <div class="cluster left">
@@ -60,7 +96,16 @@
         </div>
         <div class="start-bottom">
         <p id="start-prompt" class="prompt">Loading…</p>
+        <div id="mode-buttons" class="mode-buttons" hidden>
+          <button id="mode-race" class="btn primary big">
+            <span class="btn-title">RACE</span><span class="btn-sub">You vs 5 rivals · 3 laps</span>
+          </button>
+          <button id="mode-free" class="btn big">
+            <span class="btn-title">FREE DRIVE</span><span class="btn-sub">Practise alone</span>
+          </button>
+        </div>
         <p id="help-keyboard" class="help">
+          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc</b> menu<br />
           <b>W / ↑</b> accelerate &nbsp; <b>S / ↓</b> brake &amp; reverse &nbsp; <b>A D / ← →</b> steer<br />
           <b>Space</b> handbrake &nbsp; <b>R</b> reset car
         </p>

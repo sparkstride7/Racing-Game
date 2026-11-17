@@ -16,6 +16,25 @@ as an App Store app.
 - Keyboard controls (desktop) and multi-touch buttons (iPhone)
 - A start screen and a speedometer
 
+## Game modes
+
+- **Race**: you against 5 AI opponents over 3 laps, with a 3-2-1-GO countdown, live positions, lap counter and a results screen.
+- **Free drive**: practise alone on the circuit (the original mode).
+
+### The opponents
+
+| # | Driver | Car | Skill |
+|---|---|---|---|
+| 7 | Nova | Violet, GT wing | Fastest |
+| 22 | Ember | Orange, ducktail | |
+| 3 | Frost | White & blue, GT wing | |
+| 11 | Volt | Yellow, no wing | |
+| 45 | Jade | Matte green & gold, ducktail | Slowest |
+
+Opponents drive **the same car as you**, with the same grip and power, using the same controls
+(gas, brake, steering). Only their driving skill differs. Even the fastest opponent laps about
+1.5 s slower than the car's limit, so a good driver can beat everyone. Tune them in `src/race/roster.ts`.
+
 ## Controls
 
 | Action | Keyboard | Touchscreen |
@@ -25,6 +44,8 @@ as an App Store app.
 | Steer | A D or ← → | ◀ ▶ buttons |
 | Handbrake | Space | — |
 | Reset car | R | ↺ button (top right) |
+| Main menu | Esc | ☰ button (top right) |
+| Start a race / free drive | Enter / F | RACE / FREE DRIVE buttons |
 
 ## Technology
 
@@ -57,8 +78,15 @@ src/
   world/track/geometry.ts   Shapes that follow the track (road strips, kerbs, walls)
   world/track/scenery.ts    Grandstand, pit building, trees, hills
   world/textures.ts      Road, grass, kerb and barrier textures (drawn by code)
-  ui/Hud.ts              Start screen and speedometer logic
-tests/smoke.cjs          Automated test: drives the car in a real browser
+  race/Race.ts           Race rules: grid, countdown, positions, laps, finish, results
+  race/AIDriver.ts       How opponents drive: racing line, braking, steering, overtaking
+  race/RacingLine.ts     The ideal path round the track and a speed plan for every corner
+  race/TrackProgress.ts  Tracks each car's lap and distance (for positions)
+  race/roster.ts         The 5 opponents: names, car looks, skill levels
+  ui/Hud.ts              Main menu and speedometer
+  ui/RaceHud.ts          Race position, lap, timer, running order, countdown, results
+tests/smoke.cjs          Automated test: drives the car and races in a real browser
+tests/sim/race-sim.ts    Runs complete 6-car races without graphics to check the AI
 .github/workflows/       Publishes the game to GitHub Pages automatically
 ```
 
@@ -71,7 +99,9 @@ If you want to, install [Node.js](https://nodejs.org) 22+, then:
 npm install        # download the libraries (first time only)
 npm run dev        # play at http://localhost:5173
 npm run build      # create the final version in dist/
-npm run test:e2e   # automated driving test (needs Playwright + Chromium)
+npm test           # everything: build, race simulation, browser tests
+npm run test:race  # race simulation only (fast, no browser needed)
+npm run test:e2e   # browser tests (needs Playwright + Chromium)
 ```
 
 Add `?touch=1` to the address to see the touch controls on a computer.

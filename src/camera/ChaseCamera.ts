@@ -36,6 +36,12 @@ export class ChaseCamera {
     this.transition = 0;
   }
 
+  /** Back to slowly circling the car (main menu). */
+  showcase() {
+    this.mode = 'showcase';
+    this.initialized = false;
+  }
+
   setAspect(aspect: number) {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

@@ -6,7 +6,7 @@ import { TRACK } from '../config';
 import { findRuns, ribbonGeometry, wallGeometry } from './track/geometry';
 import { GREENFIELD_CIRCUIT, type TrackLayout } from './track/layout';
 import { createGrandstand, createHills, createPitBuilding, createTrees } from './track/scenery';
-import { TrackPath } from './track/TrackPath';
+import { TrackPath, type TrackSample } from './track/TrackPath';
 import {
   createAsphaltTexture,
   createBarrierTexture,
@@ -30,6 +30,12 @@ export class Circuit {
   spawnHeading = 0;
   /** Distance from the centre line to the track-facing side of the barriers. */
   readonly barrierOffset = TRACK.width / 2 + TRACK.curbWidth + TRACK.runoffWidth;
+
+  /** Number of painted grid slots. */
+  static readonly GRID_SLOTS = 6;
+  /** The five red start lights on the gantry, left to right. */
+  private readonly startLights: THREE.MeshStandardMaterial[] = [];
+  private startLineSample!: TrackSample;
 
   /** Ground areas kept clear of trees (buildings next to the track). */
   private readonly keepClear: THREE.Box3[] = [];
@@ -61,10 +67,12 @@ export class Circuit {
     const grass = createGrassTexture();
     grass.repeat.set(400, 400);
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(4800, 4800).rotateX(-Math.PI / 2),
+      // Split into tiles: one giant triangle pair can make the grass flicker through the road on some GPUs.
+      new THREE.PlaneGeometry(4800, 4800, 48, 48).rotateX(-Math.PI / 2),
       new THREE.MeshStandardMaterial({ map: grass, roughness: 1, metalness: 0 }),
     );
-    ground.position.copy(this.path.bounds().getCenter(new THREE.Vector3())).setY(0);
+    // A few centimetres below the road surface so the road always draws on top.
+    ground.position.copy(this.path.bounds().getCenter(new THREE.Vector3())).setY(-0.04);
     ground.receiveShadow = true;
     this.group.add(ground);
 
@@ -181,11 +189,13 @@ export class Circuit {
     const samples = this.path.samples;
     const index = this.path.nearestIndex(new THREE.Vector3(layout.startLine[0], 0, layout.startLine[1]));
     const sample = samples[index];
+    this.startLineSample = sample;
     const heading = Math.atan2(sample.tangent.x, sample.tangent.z);
 
-    // The player starts in pole position, 12 m behind the line.
-    this.spawnPosition.copy(sample.point).addScaledVector(sample.tangent, -12);
-    this.spawnHeading = heading;
+    // Free-drive spawn: pole position on the grid.
+    const pole = this.gridSlot(0);
+    this.spawnPosition.copy(pole.position);
+    this.spawnHeading = pole.heading;
 
     const start = new THREE.Group();
     start.position.copy(sample.point);
@@ -207,11 +217,11 @@ export class Circuit {
     line.receiveShadow = true;
     start.add(line);
 
-    // Painted grid slots behind the line (staggered, for future opponents).
+    // Painted grid slots behind the line (staggered, two lanes).
     const slots: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 4; i++) {
-      const z = -12 - i * 9 + 2.6;
-      const lane = (i % 2 === 0 ? 1 : -1) * 3.2;
+    for (let i = 0; i < Circuit.GRID_SLOTS; i++) {
+      const { along, lane } = gridSlotOffset(i);
+      const z = along + 2.6;
       slots.push(new THREE.PlaneGeometry(2.6, 0.25).rotateX(-Math.PI / 2).translate(lane, 0.03, z));
       slots.push(new THREE.PlaneGeometry(0.25, 1.4).rotateX(-Math.PI / 2).translate(lane - 1.18, 0.03, z - 0.7));
       slots.push(new THREE.PlaneGeometry(0.25, 1.4).rotateX(-Math.PI / 2).translate(lane + 1.18, 0.03, z - 0.7));
@@ -227,8 +237,6 @@ export class Circuit {
       }),
     );
     start.add(grid);
-    // Move the player's car onto the first grid slot (on the left, the inside of Turn 1).
-    this.spawnPosition.addScaledVector(sample.left, 3.2);
 
     // Gantry spanning the whole track, with its posts safely behind the barriers.
     const metal = new THREE.MeshStandardMaterial({ color: 0x2b2f36, metalness: 0.7, roughness: 0.35 });
@@ -246,11 +254,35 @@ export class Circuit {
     beam.castShadow = true;
     start.add(beam);
 
-    const lamps = new THREE.Mesh(
-      mergeGeometries([0, 1, 2, 3, 4].map((i) => new THREE.SphereGeometry(0.22, 12, 8).translate((i - 2) * 0.8, 6.5, -0.2))),
-      new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff2020, emissiveIntensity: 1.5 }),
-    );
-    start.add(lamps);
+    // Five start lights (separate so a race countdown can switch them on one by one).
+    const lampGeometry = new THREE.SphereGeometry(0.22, 12, 8);
+    for (let i = 0; i < 5; i++) {
+      const material = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff2020, emissiveIntensity: 1.5 });
+      const lamp = new THREE.Mesh(lampGeometry, material);
+      lamp.position.set((i - 2) * 0.8, 6.5, -0.2);
+      start.add(lamp);
+      this.startLights.push(material);
+    }
+  }
+
+  /** Lights the first `count` start lights (0 = all off, 5 = all on). */
+  setStartLights(count: number) {
+    this.startLights.forEach((m, i) => (m.emissiveIntensity = i < count ? 1.5 : 0));
+  }
+
+  /** Position and heading of grid slot `index` (0 = pole position). */
+  gridSlot(index: number) {
+    const s = this.startLineSample;
+    const { along, lane } = gridSlotOffset(index);
+    return {
+      position: s.point.clone().addScaledVector(s.tangent, along).addScaledVector(s.left, lane),
+      heading: Math.atan2(s.tangent.x, s.tangent.z),
+    };
+  }
+
+  /** Index of the track sample at the start/finish line. */
+  get startLineDistance() {
+    return this.startLineSample.distance;
   }
 
   // ---------------------------------------------------------------- Braking boards
@@ -345,4 +377,12 @@ export class Circuit {
       this.world.createCollider(RAPIER.ColliderDesc.cuboid(hx, 10, hz).setTranslation(x, 10, z));
     }
   }
+}
+
+/**
+ * Grid slot layout: staggered two-by-two, 8 m apart.
+ * Slot 0 (pole) is 12 m behind the line on the left lane (the inside of Turn 1).
+ */
+function gridSlotOffset(index: number) {
+  return { along: -12 - index * 8, lane: (index % 2 === 0 ? 1 : -1) * 3.2 };
 }
