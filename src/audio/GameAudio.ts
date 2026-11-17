@@ -208,6 +208,7 @@ export class GameAudio {
       ready: m.isReady,
       contextState: m.ctx?.state ?? null,
       muted: m.settings.muted,
+      storageStatus: m.storageStatus,
       musicVolume: m.settings.musicVolume,
       sfxVolume: m.settings.sfxVolume,
       masterGain: m.isReady ? m.master.gain.value : null,

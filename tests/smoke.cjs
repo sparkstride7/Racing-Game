@@ -543,6 +543,111 @@ async function sliderTest(browser) {
   await context.close();
 }
 
+async function persistenceTest(browser) {
+  console.log('\n— Sound settings: save, close, reopen —');
+  const KEY = 'racing-game-audio';
+  const openTab = async (context, name) => {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+    await page.goto(URL);
+    await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 30000 });
+    return { page, errors, cdp: name ? await context.newCDPSession(page) : null };
+  };
+  const sliders = async (page) => [Number(await page.locator('#music-volume').inputValue()), Number(await page.locator('#sfx-volume').inputValue())];
+  const stored = (page) => page.evaluate((k) => localStorage.getItem(k), KEY);
+
+  // --- iPhone: first visit, change both sliders by touch, close the tab, reopen. ---
+  const phone = await browser.newContext(devices['iPhone 13']);
+  let tab = await openTab(phone, 'touch');
+  let a = (await state(tab.page)).audio;
+  check('first visit: defaults used when nothing is saved', a.storageStatus === 'defaults' && a.musicVolume === 0.6 && a.sfxVolume === 0.8);
+  await tab.page.locator('#sound-settings-button').tap();
+  await touchDrag(tab.page, tab.cdp, '#music-volume', 0.9, 0.27);
+  await touchDrag(tab.page, tab.cdp, '#sfx-volume', 0.1, 0.69);
+  const [music, sfx] = await sliders(tab.page);
+  a = (await state(tab.page)).audio;
+  check('changes are saved on the device', a.storageStatus === 'saved' && (await tab.page.locator('#sound-save-status').textContent()).includes('Saved'), `${music} / ${sfx}`);
+  await tab.page.close(); // close the tab
+
+  tab = await openTab(phone, 'touch'); // reopen the game in a new tab
+  a = (await state(tab.page)).audio;
+  await tab.page.locator('#sound-settings-button').tap();
+  const [m2, s2] = await sliders(tab.page);
+  check('after closing and reopening: both sliders show the saved values', m2 === music && s2 === sfx, `music ${m2} (saved ${music}), effects ${s2} (saved ${sfx})`);
+  check('panel says the saved settings were restored', a.storageStatus === 'restored' && (await tab.page.locator('#sound-save-status').textContent()).includes('restored'));
+  await tab.page.locator('#sound-done').tap();
+  const before = await stored(tab.page);
+  await tab.page.locator('#mode-race').tap(); // sound switches on
+  await sleep(500);
+  a = (await state(tab.page)).audio;
+  check(
+    'restored values are the actual music and effects volumes',
+    Math.abs(a.musicGain - (music / 100) ** 2) < 0.01 && Math.abs(a.sfxGain - (sfx / 100) ** 2) < 0.01,
+    `music level ${a.musicGain.toFixed(3)} (expected ${((music / 100) ** 2).toFixed(3)}), effects level ${a.sfxGain.toFixed(3)} (expected ${((sfx / 100) ** 2).toFixed(3)})`,
+  );
+  check('starting the game does not overwrite the saved settings', (await stored(tab.page)) === before);
+  check('no errors', tab.errors.length === 0, tab.errors.join(' | '));
+  await phone.close();
+
+  // --- Saved values are never replaced by defaults at start-up, damaged values are handled. ---
+  const ctx = await browser.newContext(devices['iPhone 13']);
+  tab = await openTab(ctx);
+  await tab.page.evaluate((k) => localStorage.setItem(k, JSON.stringify({ muted: false, musicVolume: 0.15, sfxVolume: 0.4 })), KEY);
+  await tab.page.close();
+  tab = await openTab(ctx);
+  a = (await state(tab.page)).audio;
+  check('saved values load at start-up (not defaults)', a.musicVolume === 0.15 && a.sfxVolume === 0.4);
+  await tab.page.locator('#mode-free').tap();
+  await sleep(300);
+  check('switching sound on keeps the saved values', JSON.parse(await stored(tab.page)).musicVolume === 0.15);
+
+  await tab.page.evaluate((k) => localStorage.setItem(k, JSON.stringify({ musicVolume: 0.3 })), KEY);
+  await tab.page.close();
+  tab = await openTab(ctx);
+  a = (await state(tab.page)).audio;
+  check('partly saved settings: saved value kept, missing one uses its default', a.musicVolume === 0.3 && a.sfxVolume === 0.8);
+
+  await tab.page.evaluate((k) => localStorage.setItem(k, 'not valid data'), KEY);
+  await tab.page.close();
+  tab = await openTab(ctx);
+  a = (await state(tab.page)).audio;
+  check('damaged saved data: defaults used, no crash', a.musicVolume === 0.6 && a.sfxVolume === 0.8 && tab.errors.length === 0);
+  await ctx.close();
+
+  // --- A browser that blocks storage: the game still works and says so. ---
+  const blocked = await browser.newContext(devices['iPhone 13']);
+  await blocked.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error('storage blocked'); } });
+  });
+  tab = await openTab(blocked);
+  await tab.page.locator('#sound-settings-button').tap();
+  const msg = await tab.page.locator('#sound-save-status').textContent();
+  check('storage blocked: game still runs and warns that settings cannot be saved', (await state(tab.page)).audio.storageStatus === 'unavailable' && msg.includes('not letting'), msg);
+  await tab.page.locator('#music-volume').fill('40');
+  check('storage blocked: sliders still change the volume', (await state(tab.page)).audio.musicVolume === 0.4 && tab.errors.length === 0, tab.errors.join(' | '));
+  await blocked.close();
+
+  // --- Desktop: save with the mouse, close, reopen. ---
+  const desk = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  tab = await openTab(desk);
+  await tab.page.locator('#sound-settings-button').click();
+  const box = await tab.page.locator('#sfx-volume').boundingBox();
+  await tab.page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
+  await tab.page.mouse.down();
+  await tab.page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2, { steps: 6 });
+  await tab.page.mouse.up();
+  await tab.page.locator('#music-volume').fill('45');
+  const [dm, ds] = await sliders(tab.page);
+  await tab.page.close();
+  tab = await openTab(desk);
+  await tab.page.locator('#sound-settings-button').click();
+  const [dm2, ds2] = await sliders(tab.page);
+  check('desktop: settings saved, and restored after closing and reopening', dm2 === dm && ds2 === ds && dm === 45, `music ${dm2}, effects ${ds2}`);
+  await desk.close();
+}
+
 /** Holds a finger on a button for `ms` milliseconds using real touch events. */
 async function holdTouch(page, cdp, selector, ms) {
   const box = await page.locator(selector).boundingBox();
@@ -603,7 +708,7 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    const sections = { desktopTest, circuitTest, raceTest, audioTest, sliderTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
+    const sections = { desktopTest, circuitTest, raceTest, audioTest, sliderTest, persistenceTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
     // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
     for (const [name, run] of Object.entries(sections)) {
       if (!process.env.ONLY || process.env.ONLY === name) await run(browser);

@@ -28,6 +28,15 @@ export interface AudioStats {
   finish: number;
 }
 
+/**
+ * Where the settings came from / whether saving works, shown in the Sound settings panel.
+ * - restored: saved settings were found and loaded
+ * - defaults: nothing saved yet on this device (first visit, or the browser cleared it)
+ * - saved: the player's latest change was saved and read back successfully
+ * - unavailable: this browser won't let the game store anything
+ */
+export type StorageStatus = 'restored' | 'defaults' | 'saved' | 'unavailable';
+
 export class AudioManager {
   ctx: AudioContext | null = null;
   master!: GainNode;
@@ -36,11 +45,14 @@ export class AudioManager {
   /** One second of white noise, shared by all noise-based sounds (tyres, drums, impacts). */
   noise!: AudioBuffer;
   readonly settings: AudioSettings;
+  storageStatus: StorageStatus;
   readonly stats: AudioStats = { beep: 0, go: 0, impact: 0, finish: 0 };
   private readonly listeners: (() => void)[] = [];
 
   constructor() {
-    this.settings = loadSettings();
+    const loaded = loadSettings();
+    this.settings = loaded.settings;
+    this.storageStatus = loaded.status;
 
     // iPhone: an "ambient" audio session follows the silent switch and mixes with other apps' audio.
     const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
@@ -87,7 +99,9 @@ export class AudioManager {
       this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      this.applySettings(true);
+      // Use the loaded settings. Nothing is saved here: only the player's own changes are saved,
+      // so starting the game can never overwrite saved settings with the defaults.
+      this.applySettings(true, false);
       // Older iPhones need a sound to be started inside the tap to fully unlock audio.
       const silent = ctx.createBufferSource();
       silent.buffer = ctx.createBuffer(1, 1, 22050);
@@ -119,8 +133,8 @@ export class AudioManager {
     this.applySettings();
   }
 
-  private applySettings(immediate = false) {
-    saveSettings(this.settings);
+  private applySettings(immediate = false, save = true) {
+    if (save) this.storageStatus = saveSettings(this.settings) ? 'saved' : 'unavailable';
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const set = (param: AudioParam, value: number) => {
@@ -138,23 +152,41 @@ function clamp01(v: number) {
   return Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
 }
 
-function loadSettings(): AudioSettings {
+/**
+ * Reads saved settings. Defaults are used only for values that were never saved
+ * (or are unreadable), so one damaged value can't reset the others.
+ */
+function loadSettings(): { settings: AudioSettings; status: StorageStatus } {
+  let raw: string | null;
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<AudioSettings>;
-    return {
-      muted: typeof saved.muted === 'boolean' ? saved.muted : DEFAULTS.muted,
-      musicVolume: typeof saved.musicVolume === 'number' ? clamp01(saved.musicVolume) : DEFAULTS.musicVolume,
-      sfxVolume: typeof saved.sfxVolume === 'number' ? clamp01(saved.sfxVolume) : DEFAULTS.sfxVolume,
-    };
+    raw = localStorage.getItem(STORAGE_KEY);
   } catch {
-    return { ...DEFAULTS };
+    return { settings: { ...DEFAULTS }, status: 'unavailable' };
   }
+  if (raw === null) return { settings: { ...DEFAULTS }, status: 'defaults' };
+  let saved: Partial<AudioSettings> = {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') saved = parsed as Partial<AudioSettings>;
+  } catch {
+    /* damaged entry: fall back to defaults below */
+  }
+  const valid = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const settings = {
+    muted: typeof saved.muted === 'boolean' ? saved.muted : DEFAULTS.muted,
+    musicVolume: valid(saved.musicVolume) ? clamp01(saved.musicVolume) : DEFAULTS.musicVolume,
+    sfxVolume: valid(saved.sfxVolume) ? clamp01(saved.sfxVolume) : DEFAULTS.sfxVolume,
+  };
+  return { settings, status: 'restored' };
 }
 
-function saveSettings(settings: AudioSettings) {
+/** Saves the settings and reads them back to make sure they really were stored. */
+function saveSettings(settings: AudioSettings): boolean {
+  const json = JSON.stringify(settings);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    localStorage.setItem(STORAGE_KEY, json);
+    return localStorage.getItem(STORAGE_KEY) === json;
   } catch {
-    /* private browsing: settings just aren't remembered */
+    return false; // storage blocked or full
   }
 }

@@ -12,6 +12,7 @@ export class SoundControls {
   private readonly toggle = getElement('sound-toggle');
   private readonly music = getElement('music-volume') as HTMLInputElement;
   private readonly sfx = getElement('sfx-volume') as HTMLInputElement;
+  private readonly status = getElement('sound-save-status');
   private lastPreview = 0;
 
   constructor(private readonly audio: AudioManager) {
@@ -34,9 +35,13 @@ export class SoundControls {
     followFinger(this.music);
     followFinger(this.sfx);
 
-    this.music.addEventListener('input', () => audio.setMusicVolume(Number(this.music.value) / 100));
+    this.music.addEventListener('input', () => {
+      audio.setMusicVolume(Number(this.music.value) / 100);
+      this.showStatus();
+    });
     this.sfx.addEventListener('input', () => {
       audio.setSfxVolume(Number(this.sfx.value) / 100);
+      this.showStatus();
       // A short beep so the player hears the new effects volume (at most a few per second).
       if (audio.isReady && !audio.settings.muted && performance.now() - this.lastPreview > 250) {
         this.lastPreview = performance.now();
@@ -61,6 +66,20 @@ export class SoundControls {
     this.toggle.setAttribute('aria-pressed', String(!muted));
     this.music.value = String(Math.round(musicVolume * 100));
     this.sfx.value = String(Math.round(sfxVolume * 100));
+    this.showStatus();
+  }
+
+  /** Tells the player whether their settings are being kept on this device. */
+  private showStatus() {
+    const messages = {
+      restored: '✓ Your saved settings were restored',
+      defaults: 'Default settings (your changes will be saved on this device)',
+      saved: '✓ Saved on this device',
+      unavailable: '⚠ This browser is not letting the game save settings',
+    };
+    const status = this.audio.storageStatus;
+    this.status.textContent = messages[status];
+    this.status.classList.toggle('warn', status === 'unavailable');
   }
 }
 

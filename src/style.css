@@ -809,6 +809,15 @@ body.touch #sound-button {
   background: var(--accent);
   border-color: transparent;
 }
+.sound-status {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7ee2a8;
+}
+.sound-status.warn {
+  color: #ffd23f;
+}
 .sound-note {
   margin: 8px 0 12px;
   font-size: 12px;
@@ -827,5 +836,35 @@ body.touch #sound-button {
   .btn.small {
     margin-top: 8px;
     padding: 6px 14px;
+  }
+}
+
+/* Short screens (phone held sideways): keep the whole Sound panel visible. */
+@media (max-height: 420px) {
+  #sound-panel {
+    padding: 8px;
+    overflow-y: auto;
+  }
+  .sound-card {
+    width: min(460px, 100%);
+    padding: 8px 18px 10px;
+  }
+  .sound-card h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+  }
+  .sound-row {
+    padding: 2px 0;
+  }
+  .sound-status {
+    margin: 4px 0 0;
+  }
+  .sound-note {
+    margin: 2px 0 6px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  #sound-done {
+    padding: 8px 20px;
   }
 }
