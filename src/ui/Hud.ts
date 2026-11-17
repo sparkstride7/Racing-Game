@@ -26,6 +26,7 @@ export class Hud {
     this.startScreen.classList.remove('hidden');
     this.startScreen.classList.add('ready');
     this.modeButtons.hidden = false;
+    getElement('sound-settings-button').hidden = false;
     this.hud.hidden = true;
     this.menuButton.hidden = true;
     document.body.classList.remove('playing');
@@ -44,6 +45,7 @@ export class Hud {
     getElement('mode-race').onclick = () => choose('race');
     getElement('mode-free').onclick = () => choose('free');
     this.keyHandler = (e: KeyboardEvent) => {
+      if (!getElement('sound-panel').hidden) return;
       if (e.code === 'Enter' || e.code === 'NumpadEnter') choose('race');
       else if (e.code === 'KeyF') choose('free');
     };

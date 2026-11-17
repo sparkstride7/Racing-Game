@@ -265,6 +265,7 @@ const HUD_PARTS = {
   'running order': '#standings',
   speedometer: '#hud .speedo',
   'menu button': '#menu-button',
+  'sound button': '#sound-button',
   'reset button': '#touch-controls .reset',
   'steering buttons': '#touch-controls .cluster.left',
   'pedal buttons': '#touch-controls .cluster.right',
@@ -282,6 +283,14 @@ async function hudLayoutTest(browser) {
   ];
   for (const name of screens) {
     const { context, page } = await openGame(browser, devices[name]);
+    await page.locator('#sound-settings-button').tap();
+    await sleep(200);
+    const card = await page.locator('.sound-card').boundingBox();
+    const vp0 = page.viewportSize();
+    const fits = card.x >= 0 && card.y >= 0 && card.x + card.width <= vp0.width && card.y + card.height <= vp0.height;
+    await page.screenshot({ path: path.join(OUT, `layout-${name.replace(/\s+/g, '-')}-sound-panel.png`) });
+    check(`${name}: sound settings panel fits on screen`, fits, fits ? '' : `panel ${Math.round(card.width)} px wide on a ${vp0.width} px screen`);
+    await page.locator('#sound-done').tap();
     for (const mode of ['race', 'free']) {
       if (mode === 'free') {
         await page.locator('#menu-button').tap();
@@ -310,12 +319,147 @@ async function hudLayoutTest(browser) {
           if (gapX < 4 && gapY < 4) problems.push(`${labels[i]} overlaps ${labels[j]}`);
         }
       if ((await page.locator('#countdown').textContent()) === 'FINAL LAP') problems.push('"FINAL LAP" shown at the start');
+      if (mode === 'race') {
+        await page.evaluate(() => window.__game.placeBeforeFinish(5));
+        await page.locator('#results').waitFor({ state: 'visible', timeout: 60000 }).catch(() => undefined);
+        const results = await page.locator('.results-card').boundingBox();
+        const ok = results && results.x >= 0 && results.x + results.width <= vp.width + 0.5;
+        await page.screenshot({ path: path.join(OUT, `layout-${name.replace(/\s+/g, '-')}-results.png`) });
+        check(`${name}: results screen fits the screen width`, ok, results ? `${Math.round(results.width)} px wide on a ${vp.width} px screen` : 'results not shown');
+        await page.locator('#results-menu').tap();
+        await sleep(300);
+        await page.locator('#mode-race').tap(); // back into the race so the next screenshot matches
+        await sleep(300);
+      }
       const file = `layout-${name.replace(/\s+/g, '-')}-${mode}.png`;
       await page.screenshot({ path: path.join(OUT, file) });
       check(`${name} (${vp.width}×${vp.height}) ${mode}: panels don't overlap and fit on screen`, problems.length === 0, problems.join('; '));
     }
     await context.close();
   }
+}
+
+/** Waits (in game time, up to `seconds`) until `test(state)` is true. Returns the last state. */
+async function waitUntil(page, test, seconds) {
+  const start = (await state(page)).simTime;
+  let s = await state(page);
+  while (!test(s) && s.simTime - start < seconds) {
+    await sleep(40);
+    s = await state(page);
+  }
+  return s;
+}
+
+async function audioTest(browser) {
+  console.log('\n— Sound —');
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
+  let a = (await state(page)).audio;
+  check('no sound before the player interacts (browser rule)', a.ready === false && a.contextState === null);
+
+  // Sound settings panel on the main menu.
+  await page.locator('#sound-settings-button').click();
+  check('sound settings panel opens from the menu', await page.locator('#sound-panel').isVisible());
+  await page.locator('#music-volume').fill('30');
+  await page.locator('#sfx-volume').fill('55');
+  a = (await state(page)).audio;
+  check('music and effects volumes adjust separately', Math.abs(a.musicVolume - 0.3) < 0.01 && Math.abs(a.sfxVolume - 0.55) < 0.01, `music ${a.musicVolume}, effects ${a.sfxVolume}`);
+  await page.locator('#sound-done').click();
+  check('sound settings panel closes', !(await page.locator('#sound-panel').isVisible()));
+
+  // Start a race: sound switches on.
+  await page.locator('#mode-race').click();
+  await drive(page, 0.3);
+  let s = await state(page);
+  check('sound starts when the player taps RACE', s.audio.ready && s.audio.contextState === 'running', s.audio.contextState);
+  check('no music during the countdown', !s.audio.musicPlaying);
+  const idleFrequency = s.audio.engineFrequency;
+  const beepsBefore = s.audio.counts.beep; // the volume preview may have beeped once
+
+  // Countdown → GO.
+  s = await waitUntil(page, (x) => x.race.time > 0.3, 8);
+  check('countdown beeps on 3, 2 and 1', s.audio.counts.beep - beepsBefore === 3, `${s.audio.counts.beep - beepsBefore} beeps`);
+  check('GO! beep', s.audio.counts.go === 1);
+  check('race music starts at GO!', s.audio.musicPlaying);
+
+  // Engine pitch follows speed.
+  await page.keyboard.down('ArrowUp');
+  s = await waitUntil(page, (x) => x.speedKmh > 90, 6);
+  check('no false crash sounds during clean driving (start, acceleration)', s.audio.counts.impact === 0, `${s.audio.counts.impact} crash sound(s)`);
+  // Hard braking alone must not sound like a crash either.
+  await page.keyboard.up('ArrowUp');
+  await page.keyboard.down('ArrowDown');
+  await drive(page, 1.2);
+  await page.keyboard.up('ArrowDown');
+  check('no crash sound when braking hard', (await state(page)).audio.counts.impact === 0);
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 1);
+  check('engine pitch rises with speed', s.audio.engineFrequency > idleFrequency + 40, `${idleFrequency.toFixed(0)} Hz at rest → ${s.audio.engineFrequency.toFixed(0)} Hz at ${s.speedKmh.toFixed(0)} km/h`);
+
+  // Hard steering with the handbrake: the tyres squeal.
+  await page.keyboard.down('ArrowLeft');
+  await page.keyboard.down('Space');
+  let maxSqueal = 0;
+  await waitUntil(
+    page,
+    (x) => {
+      maxSqueal = Math.max(maxSqueal, x.audio.squeal);
+      return maxSqueal > 0.2;
+    },
+    4,
+  );
+  await page.keyboard.up('Space');
+  check('tyres squeal when sliding', maxSqueal > 0.2, `loudest squeal ${(maxSqueal * 100).toFixed(0)}%`);
+
+  await page.keyboard.up('ArrowLeft');
+
+  // Finish line.
+  await page.evaluate(() => window.__game.placeBeforeFinish(40));
+  s = await waitUntil(page, (x) => x.audio.counts.finish > 0, 6);
+  await page.keyboard.up('ArrowUp');
+  check('finish fanfare when the player completes the race', s.audio.counts.finish === 1);
+
+  // Mute button and M key.
+  await page.locator('#results-menu').click();
+  await page.locator('#mode-free').click();
+  await drive(page, 0.5);
+  s = await state(page);
+  check('no music in free drive', !s.audio.musicPlaying);
+  check('engine sound in free drive', s.audio.engineLevel > 0);
+
+  // Drive down the straight, then turn into the barrier: a crash sound.
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 2.5);
+  const impactsBefore = (await state(page)).audio.counts.impact;
+  await page.keyboard.down('ArrowLeft');
+  s = await waitUntil(page, (x) => x.audio.counts.impact > impactsBefore, 6);
+  await page.keyboard.up('ArrowLeft');
+  await page.keyboard.up('ArrowUp');
+  check('collision sound when hitting the barrier', s.audio.counts.impact > impactsBefore, `${s.audio.counts.impact - impactsBefore} impact(s), ${s.distanceFromCenter.toFixed(1)} m from centre`);
+  check('sound button is visible while driving', await page.locator('#sound-button').isVisible());
+  await page.locator('#sound-button').click();
+  await sleep(300);
+  s = await state(page);
+  check('sound button mutes everything', s.audio.muted && s.audio.masterGain < 0.05, `volume ${s.audio.masterGain.toFixed(2)}`);
+  await page.keyboard.press('KeyM');
+  await sleep(300);
+  s = await state(page);
+  check('M key turns sound back on', !s.audio.muted && s.audio.masterGain > 0.9);
+  await page.locator('#sound-button').click(); // mute again, to test that it is remembered
+
+  // Settings are remembered after reloading the page.
+  await page.reload();
+  await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 30000 });
+  s = await state(page);
+  check(
+    'sound settings are remembered',
+    s.audio.muted && Math.abs(s.audio.musicVolume - 0.3) < 0.01 && Math.abs(s.audio.sfxVolume - 0.55) < 0.01,
+  );
+  await page.locator('#sound-settings-button').click();
+  check('settings panel shows the saved choices', (await page.locator('#sound-toggle').textContent()) === 'Off' && (await page.locator('#music-volume').inputValue()) === '30');
+  await page.locator('#sound-toggle').click();
+  check('sound can be switched back on from the settings panel', !(await state(page)).audio.muted);
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
 }
 
 /** Holds a finger on a button for `ms` milliseconds using real touch events. */
@@ -378,7 +522,7 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    const sections = { desktopTest, circuitTest, raceTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
+    const sections = { desktopTest, circuitTest, raceTest, audioTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
     // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
     for (const [name, run] of Object.entries(sections)) {
       if (!process.env.ONLY || process.env.ONLY === name) await run(browser);

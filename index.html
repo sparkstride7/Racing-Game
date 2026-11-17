@@ -40,6 +40,15 @@
     <!-- Big centre text: 3, 2, 1, GO! and "FINAL LAP" -->
     <div id="countdown" aria-live="assertive"></div>
 
+    <!-- Sound on/off (shown while driving) -->
+    <button id="sound-button" aria-label="Sound on/off" aria-pressed="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M4 9h4l5-4v14l-5-4H4z" />
+        <path class="waves" d="M16.5 9.5a3.5 3.5 0 0 1 0 5M19 7a7 7 0 0 1 0 10" />
+        <path class="cross" d="M16 9.5l5 5M21 9.5l-5 5" />
+      </svg>
+    </button>
+
     <!-- Back to the main menu (shown while driving) -->
     <button id="menu-button" hidden aria-label="Main menu">
       <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
@@ -104,8 +113,9 @@
             <span class="btn-title">FREE DRIVE</span><span class="btn-sub">Practise alone</span>
           </button>
         </div>
+        <button id="sound-settings-button" class="btn small" hidden>🔊 Sound settings</button>
         <p id="help-keyboard" class="help">
-          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc</b> menu<br />
+          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc</b> menu &nbsp; <b>M</b> sound on/off<br />
           <b>W / ↑</b> accelerate &nbsp; <b>S / ↓</b> brake &amp; reverse &nbsp; <b>A D / ← →</b> steer<br />
           <b>Space</b> handbrake &nbsp; <b>R</b> reset car
         </p>
@@ -114,6 +124,27 @@
           <span class="rotate-hint">Turn your phone sideways for the best view</span>
         </p>
         </div>
+      </div>
+    </div>
+
+    <!-- Sound settings -->
+    <div id="sound-panel" hidden>
+      <div class="sound-card" role="dialog" aria-label="Sound settings">
+        <h3>Sound</h3>
+        <div class="sound-row">
+          <span>Sound</span>
+          <button id="sound-toggle" class="btn toggle" aria-pressed="true">On</button>
+        </div>
+        <label class="sound-row" for="music-volume">
+          <span>Music</span>
+          <input id="music-volume" type="range" min="0" max="100" step="1" />
+        </label>
+        <label class="sound-row" for="sfx-volume">
+          <span>Effects</span>
+          <input id="sfx-volume" type="range" min="0" max="100" step="1" />
+        </label>
+        <p class="sound-note">On iPhone, sound follows the silent switch.</p>
+        <button id="sound-done" class="btn primary">Done</button>
       </div>
     </div>
 

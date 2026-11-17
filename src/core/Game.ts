@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { CAR } from '../config';
 import { Input, type DriveControls } from '../input/Input';
+import { GameAudio } from '../audio/GameAudio';
 import { Race } from '../race/Race';
 import { Hud, type GameMode } from '../ui/Hud';
 import { RaceHud } from '../ui/RaceHud';
+import { SoundControls } from '../ui/SoundControls';
 import { Car } from '../vehicle/Car';
 import { Environment } from '../world/Environment';
 import { Circuit } from '../world/Circuit';
@@ -21,6 +23,8 @@ export class Game {
   readonly scene = new THREE.Scene();
   readonly isTouch: boolean;
   readonly hud: Hud;
+  /** All sound and music (generated in code). */
+  readonly audio = new GameAudio();
 
   private physics!: Physics;
   private environment!: Environment;
@@ -83,6 +87,7 @@ export class Game {
       () => this.showMenu(),
     );
     this.hud.onMenuButton(() => this.showMenu());
+    new SoundControls(this.audio.manager);
 
     window.addEventListener('resize', () => this.onResize());
     this.onResize();
@@ -104,6 +109,8 @@ export class Game {
 
   /** Starts free drive (alone, as before) or a race against the five opponents. */
   startMode(mode: GameMode) {
+    // Called from the player's tap/click/key press, so sound is allowed to start now.
+    this.audio.unlock();
     this.endRace();
     this.mode = mode;
     this.started = true;
@@ -134,12 +141,18 @@ export class Game {
       ? this.physics.update(
           dt,
           (stepDt) => race.fixedUpdate(stepDt, controls),
-          () => race.postStep(),
+          () => {
+            race.postStep();
+            this.audio.afterPhysicsStep(this.physics.dt, this.car, race);
+          },
         )
       : this.physics.update(
           dt,
           (stepDt) => this.car.fixedUpdate(controls, stepDt),
-          () => this.car.postStep(),
+          () => {
+            this.car.postStep();
+            this.audio.afterPhysicsStep(this.physics.dt, this.car, null);
+          },
         );
     if (race) {
       race.render(alpha);
@@ -150,6 +163,8 @@ export class Game {
     this.chaseCamera.update(this.car.object, speed, dt);
     this.environment.update(this.car.object.position);
     this.hud.setSpeed(this.car.speedKmh, Math.abs(speed) / CAR.topSpeed);
+
+    this.audio.update({ dt, playerCar: this.car, throttle: controls.throttle, driving: this.started, race: this.race });
 
     this.renderer.render(this.scene, this.chaseCamera.camera);
   }
@@ -196,6 +211,7 @@ export class Game {
           heading: Math.atan2(f.x, f.z),
           fps: this.fps,
           simTime: this.physics.time,
+          audio: this.audio.debugState(),
           distanceFromCenter: this.track.path.distanceToCenter(p),
           barrierOffset: this.track.barrierOffset,
           drawCalls: this.renderer.info.render.calls,

@@ -572,6 +572,7 @@ body.touch #menu-button {
   }
 }
 .results-card {
+  box-sizing: border-box; /* padding inside the width, so it never gets wider than the screen */
   width: min(520px, 100%);
   padding: 18px 20px;
   border-radius: 22px;
@@ -692,5 +693,136 @@ body.touch #menu-button {
   .gas {
     width: 70px;
     height: 96px;
+  }
+}
+
+/* ---------- Sound button (top right, shown while driving) ----------
+   Row order from the right: [reset] (touch only), [menu], [sound]. */
+#sound-button {
+  position: absolute;
+  top: calc(14px + var(--safe-top));
+  right: calc(70px + var(--safe-right));
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+}
+body:not(.playing) #sound-button {
+  display: none;
+}
+body.touch #sound-button {
+  right: calc(124px + var(--safe-right));
+}
+#sound-button svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#sound-button .cross {
+  display: none;
+}
+#sound-button.muted .waves {
+  display: none;
+}
+#sound-button.muted .cross {
+  display: inline;
+}
+#sound-button.muted {
+  color: #ff8a8a;
+}
+/* Phone held upright: the sound button goes under the reset button, the speedometer below it. */
+@media (orientation: portrait) {
+  body.touch #sound-button {
+    top: calc(14px + 44px + 10px + var(--safe-top));
+    right: calc(16px + var(--safe-right));
+  }
+  body.touch #hud {
+    top: calc(14px + 44px + 10px + 44px + 10px + var(--safe-top));
+  }
+}
+
+/* ---------- Sound settings ---------- */
+.btn.small {
+  margin-top: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+}
+#sound-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 8, 14, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade-in 0.25s ease;
+}
+.sound-card {
+  box-sizing: border-box; /* padding inside the width, so it never gets wider than the screen */
+  width: min(360px, 100%);
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  text-align: center;
+}
+.sound-card h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+}
+.sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  font-size: 15px;
+  font-weight: 700;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sound-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  max-width: 190px;
+  accent-color: var(--accent);
+  height: 28px;
+}
+.btn.toggle {
+  min-width: 72px;
+  padding: 8px 14px;
+}
+.btn.toggle[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: transparent;
+}
+.sound-note {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+@media (max-height: 420px) {
+  .sound-card {
+    padding: 10px 18px;
+  }
+  .sound-row {
+    padding: 4px 0;
+  }
+  .sound-note {
+    margin: 4px 0 8px;
+  }
+  .btn.small {
+    margin-top: 8px;
+    padding: 6px 14px;
   }
 }
