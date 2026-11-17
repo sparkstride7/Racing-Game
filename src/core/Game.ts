@@ -5,7 +5,7 @@ import { Input, type DriveControls } from '../input/Input';
 import { Hud } from '../ui/Hud';
 import { Car } from '../vehicle/Car';
 import { Environment } from '../world/Environment';
-import { TestTrack } from '../world/TestTrack';
+import { Circuit } from '../world/Circuit';
 import { Physics } from './Physics';
 
 const NO_INPUT: DriveControls = { throttle: 0, brake: 0, steer: 0, handbrake: false };
@@ -22,7 +22,7 @@ export class Game {
 
   private physics!: Physics;
   private environment!: Environment;
-  private track!: TestTrack;
+  private track!: Circuit;
   private car!: Car;
   private chaseCamera!: ChaseCamera;
   private input!: Input;
@@ -53,7 +53,7 @@ export class Game {
     this.environment = new Environment(this.scene, this.renderer, {
       shadowMapSize: this.isTouch ? 1024 : 2048,
     });
-    this.track = new TestTrack(this.scene, this.physics.world);
+    this.track = new Circuit(this.scene, this.physics.world);
 
     this.car = new Car(this.physics.world);
     this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading);
@@ -120,8 +120,20 @@ export class Game {
           heading: Math.atan2(f.x, f.z),
           fps: this.fps,
           simTime: this.physics.time,
+          distanceFromCenter: this.track.path.distanceToCenter(p),
+          barrierOffset: this.track.barrierOffset,
+          drawCalls: this.renderer.info.render.calls,
+          triangles: this.renderer.info.render.triangles,
         };
       },
+      /** Test helper: puts the car on the centre line at `fraction` (0..1) of the way round the lap. */
+      teleport: (fraction: number) => {
+        const samples = this.track.path.samples;
+        const s = samples[Math.floor(fraction * (samples.length - 1))];
+        this.car.setSpawn(s.point, Math.atan2(s.tangent.x, s.tangent.z));
+      },
+      /** Test helper: puts the car back on the starting grid. */
+      returnToGrid: () => this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading),
     };
   }
 }

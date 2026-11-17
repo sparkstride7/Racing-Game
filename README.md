@@ -9,7 +9,10 @@ as an App Store app.
 - A placeholder sports car built entirely from code, with working suspension, steering and spinning wheels
 - Arcade driving physics: smooth acceleration, braking, reversing, a handbrake, and steering that gets calmer at high speed
 - A third-person chase camera that swings round smoothly and pulls back as you speed up
-- A 1.4 km test circuit with kerbs, a start/finish gantry, a grandstand, trees and hills
+- **Greenfield Circuit**: a 1.76 km racing circuit with a long main straight and varied corners
+  - Red-and-white kerbs on every corner, concrete safety barriers along both sides
+  - Chequered start/finish line, start gantry with lights, painted grid slots
+  - 300/200/100 m braking boards, pit building, covered grandstand, about 1000 trees and distant hills
 - Keyboard controls (desktop) and multi-touch buttons (iPhone)
 - A start screen and a speedometer
 
@@ -48,8 +51,12 @@ src/
   camera/ChaseCamera.ts  Third-person camera
   input/                 Keyboard and touchscreen controls
   world/Environment.ts   Sky, sun, shadows, fog
-  world/TestTrack.ts     The test circuit and scenery
-  world/textures.ts      Road, grass and kerb textures (drawn by code)
+  world/Circuit.ts       Builds a complete circuit: road, kerbs, barriers, start line, scenery
+  world/track/layout.ts  Track layouts as data (add new tracks here)
+  world/track/TrackPath.ts  The track's centre line: sampling, curvature, distances
+  world/track/geometry.ts   Shapes that follow the track (road strips, kerbs, walls)
+  world/track/scenery.ts    Grandstand, pit building, trees, hills
+  world/textures.ts      Road, grass, kerb and barrier textures (drawn by code)
   ui/Hud.ts              Start screen and speedometer logic
 tests/smoke.cjs          Automated test: drives the car in a real browser
 .github/workflows/       Publishes the game to GitHub Pages automatically

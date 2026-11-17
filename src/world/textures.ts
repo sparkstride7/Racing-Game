@@ -95,3 +95,85 @@ export function createCheckerTexture(columns = 8, rows = 2) {
   texture.magFilter = THREE.NearestFilter;
   return texture;
 }
+
+/**
+ * Concrete safety barrier. U runs along the wall, V from bottom (0) to top (1).
+ * Red-and-white blocks along the top, grey concrete below.
+ */
+export function createBarrierTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.fillStyle = '#c9c6bf';
+  ctx.fillRect(0, 0, w, h);
+  speckle(ctx, w, 9000, ['#bdbab3', '#d3d0c9', '#b4b1aa'], 2, 21);
+  // Panel joints every quarter.
+  ctx.fillStyle = 'rgba(60,60,60,0.35)';
+  for (let x = 0; x < w; x += w / 4) ctx.fillRect(x, 0, 2, h);
+  // Painted band along the top: alternating red and white.
+  const band = h * 0.36;
+  for (let i = 0; i < 2; i++) {
+    ctx.fillStyle = i === 0 ? '#d42a2a' : '#f2f2ee';
+    ctx.fillRect((i * w) / 2, 0, w / 2, band);
+  }
+  // Dirt near the ground.
+  const grime = ctx.createLinearGradient(0, h, 0, h * 0.6);
+  grime.addColorStop(0, 'rgba(70,60,45,0.45)');
+  grime.addColorStop(1, 'rgba(70,60,45,0)');
+  ctx.fillStyle = grime;
+  ctx.fillRect(0, h * 0.6, w, h * 0.4);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+/** Braking marker boards before a corner ("300", "200", "100"), all in one texture strip. */
+export function createDistanceBoardTexture(labels: string[]) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256 * labels.length;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  labels.forEach((label, i) => {
+    const x = i * 256;
+    ctx.fillStyle = '#f4f4f0';
+    ctx.fillRect(x, 0, 256, 128);
+    ctx.strokeStyle = '#1b1f27';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(x + 5, 5, 246, 118);
+    ctx.fillStyle = '#1b1f27';
+    ctx.font = 'bold 84px Arial, Helvetica, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + 128, 68);
+  });
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+/** Front of the pit building: garage doors below, windows above. Repeats along the building. */
+export function createPitBuildingTexture() {
+  return canvasTexture(256, (ctx, size) => {
+    ctx.fillStyle = '#eceef1';
+    ctx.fillRect(0, 0, size, size);
+    // Upper floor windows.
+    ctx.fillStyle = '#26384a';
+    ctx.fillRect(0, size * 0.08, size, size * 0.3);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let x = 0; x < size; x += size / 4) ctx.fillRect(x, size * 0.08, 3, size * 0.3);
+    // Red stripe.
+    ctx.fillStyle = '#e3262f';
+    ctx.fillRect(0, size * 0.44, size, size * 0.06);
+    // Garage door.
+    ctx.fillStyle = '#3a3f47';
+    ctx.fillRect(size * 0.12, size * 0.56, size * 0.76, size * 0.44);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    for (let y = size * 0.6; y < size; y += 10) ctx.fillRect(size * 0.12, y, size * 0.76, 2);
+  });
+}

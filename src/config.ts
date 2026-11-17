@@ -86,6 +86,14 @@ export const CAMERA = {
 };
 
 export const TRACK = {
+  /** Width of the asphalt. */
   width: 14,
+  /** Red-and-white kerbs, placed on the corners. */
   curbWidth: 1.2,
+  /** Corners tighter than this radius get kerbs. */
+  curbCornerRadius: 140,
+  /** Grass between the kerb and the safety barrier. */
+  runoffWidth: 7,
+  barrierHeight: 1.0,
+  barrierThickness: 0.6,
 };
