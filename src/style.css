@@ -645,3 +645,52 @@ body.touch #menu-button {
     margin-top: 8px;
   }
 }
+
+/* ---------- Phone held upright: keep the top panels apart ----------
+   Landscape keeps the speedometer centred at the top. In portrait the screen is too
+   narrow for the race panel (left) and a centred speedometer, so the speedometer
+   moves to the right-hand side, just below the menu and reset buttons. */
+@media (orientation: portrait) {
+  body.touch #hud {
+    top: calc(14px + 44px + 10px + var(--safe-top));
+    right: calc(16px + var(--safe-right));
+    left: auto;
+    transform: none;
+  }
+  /* Countdown a little lower so it doesn't cover the running order. */
+  #countdown {
+    top: 45%;
+  }
+}
+
+/* Very narrow phones (e.g. iPhone SE, 320 points wide): slightly more compact panels and buttons. */
+@media (orientation: portrait) and (max-width: 360px) {
+  #race-hud {
+    left: calc(10px + var(--safe-left));
+    width: 156px;
+  }
+  body.touch .speedo {
+    min-width: 96px;
+  }
+  #touch-controls .left {
+    left: calc(12px + var(--safe-left));
+  }
+  #touch-controls .right {
+    right: calc(12px + var(--safe-right));
+  }
+  #touch-controls .cluster {
+    gap: 8px;
+  }
+  .steer {
+    width: 64px;
+    height: 64px;
+  }
+  .brake {
+    width: 60px;
+    height: 60px;
+  }
+  .gas {
+    width: 70px;
+    height: 96px;
+  }
+}

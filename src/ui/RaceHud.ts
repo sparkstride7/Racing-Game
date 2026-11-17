@@ -15,7 +15,7 @@ export class RaceHud {
 
   private rows: HTMLLIElement[] = [];
   private lastCountdown = '';
-  private bannerUntil = 0;
+  private bannerUntil = -Infinity;
   private lastLap = 1;
   private nextListUpdate = 0;
   private resultsShown = false;
@@ -27,7 +27,7 @@ export class RaceHud {
     this.resultsShown = false;
     this.lapsTotal.textContent = String(race.laps);
     this.lastLap = 1;
-    this.bannerUntil = 0;
+    this.bannerUntil = -Infinity; // the race clock starts negative (countdown), so 0 would show the banner
     this.standings.replaceChildren();
     this.rows = race.racers.map(() => {
       const li = document.createElement('li');

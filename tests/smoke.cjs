@@ -181,7 +181,10 @@ async function raceTest(browser) {
   // ?laps=2 keeps the test short; real races are 3 laps.
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
   await page.keyboard.press('Enter');
-  await drive(page, 1.2);
+  await drive(page, 0.3);
+  const early = await page.locator('#countdown').textContent();
+  check('no "FINAL LAP" banner before the countdown', early !== 'FINAL LAP', `shows "${early}"`);
+  await drive(page, 0.9);
   let s = await state(page);
   check('race mode started with 6 cars', s.mode === 'race' && s.race.cars.length === 6, `${s.race.cars.length} cars`);
   check('countdown is showing', ['3', '2', '1'].includes(s.race.countdown), `shows "${s.race.countdown}"`);
@@ -256,6 +259,65 @@ async function iphoneRaceTest(browser) {
   await context.close();
 }
 
+/** On-screen panels and buttons that must never overlap each other or leave the screen. */
+const HUD_PARTS = {
+  'position panel': '#race-hud .race-card',
+  'running order': '#standings',
+  speedometer: '#hud .speedo',
+  'menu button': '#menu-button',
+  'reset button': '#touch-controls .reset',
+  'steering buttons': '#touch-controls .cluster.left',
+  'pedal buttons': '#touch-controls .cluster.right',
+};
+
+async function hudLayoutTest(browser) {
+  console.log('\n— HUD layout on iPhone screen sizes —');
+  const screens = [
+    'iPhone SE',
+    'iPhone SE landscape',
+    'iPhone 13',
+    'iPhone 13 landscape',
+    'iPhone 14 Pro Max',
+    'iPhone 14 Pro Max landscape',
+  ];
+  for (const name of screens) {
+    const { context, page } = await openGame(browser, devices[name]);
+    for (const mode of ['race', 'free']) {
+      if (mode === 'free') {
+        await page.locator('#menu-button').tap();
+        await sleep(300);
+      }
+      await page.locator(mode === 'race' ? '#mode-race' : '#mode-free').tap();
+      await sleep(600);
+      const boxes = {};
+      for (const [label, selector] of Object.entries(HUD_PARTS)) {
+        const el = page.locator(selector);
+        if (await el.isVisible()) boxes[label] = await el.boundingBox();
+      }
+      const vp = page.viewportSize();
+      const problems = [];
+      const labels = Object.keys(boxes);
+      for (const a of labels) {
+        const b = boxes[a];
+        if (b.x < 0 || b.y < 0 || b.x + b.width > vp.width + 0.5 || b.y + b.height > vp.height + 0.5) problems.push(`${a} goes off screen`);
+      }
+      for (let i = 0; i < labels.length; i++)
+        for (let j = i + 1; j < labels.length; j++) {
+          const a = boxes[labels[i]];
+          const b = boxes[labels[j]];
+          const gapX = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width));
+          const gapY = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height));
+          if (gapX < 4 && gapY < 4) problems.push(`${labels[i]} overlaps ${labels[j]}`);
+        }
+      if ((await page.locator('#countdown').textContent()) === 'FINAL LAP') problems.push('"FINAL LAP" shown at the start');
+      const file = `layout-${name.replace(/\s+/g, '-')}-${mode}.png`;
+      await page.screenshot({ path: path.join(OUT, file) });
+      check(`${name} (${vp.width}×${vp.height}) ${mode}: panels don't overlap and fit on screen`, problems.length === 0, problems.join('; '));
+    }
+    await context.close();
+  }
+}
+
 /** Holds a finger on a button for `ms` milliseconds using real touch events. */
 async function holdTouch(page, cdp, selector, ms) {
   const box = await page.locator(selector).boundingBox();
@@ -316,11 +378,11 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    await desktopTest(browser);
-    await circuitTest(browser);
-    await raceTest(browser);
-    await iphoneTest(browser);
-    await iphoneRaceTest(browser);
+    const sections = { desktopTest, circuitTest, raceTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
+    // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
+    for (const [name, run] of Object.entries(sections)) {
+      if (!process.env.ONLY || process.env.ONLY === name) await run(browser);
+    }
   } finally {
     await browser.close();
     server.kill();
