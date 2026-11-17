@@ -5,7 +5,15 @@ import { Game } from './core/Game';
 async function main() {
   // Stop iOS Safari from zooming or scrolling the page while playing.
   document.addEventListener('gesturestart', (e) => e.preventDefault());
-  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  // (Sliders are the exception: they need finger drags to move.)
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.target instanceof Element && e.target.closest('input[type="range"]')) return;
+      e.preventDefault();
+    },
+    { passive: false },
+  );
   document.addEventListener('dblclick', (e) => e.preventDefault());
 
   let game: Game;

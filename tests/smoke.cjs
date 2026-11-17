@@ -462,6 +462,87 @@ async function audioTest(browser) {
   await context.close();
 }
 
+/** Drags a finger across a slider from one fraction of its width to another (real touch events). */
+async function touchDrag(page, cdp, selector, from, to) {
+  const box = await page.locator(selector).boundingBox();
+  const y = box.y + box.height / 2;
+  const x = (f) => box.x + box.width * f;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x(from), y }] });
+  for (let i = 1; i <= 12; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x(from + (to - from) * (i / 12)), y }] });
+    await sleep(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(250); // let the volume glide to its new level
+}
+
+async function sliderTest(browser) {
+  console.log('\n— Sound sliders (touch and mouse) —');
+  for (const name of ['iPhone SE', 'iPhone 13 landscape', 'iPhone 14 Pro Max']) {
+    const { context, page, errors } = await openGame(browser, devices[name]);
+    const cdp = await context.newCDPSession(page);
+    await page.locator('#sound-settings-button').tap();
+    await sleep(300);
+
+    // Music: drag from the right end down to about a quarter.
+    await touchDrag(page, cdp, '#music-volume', 0.95, 0.27);
+    let s = await state(page);
+    const music = Number(await page.locator('#music-volume').inputValue());
+    check(
+      `${name}: Music slider follows a finger drag`,
+      music >= 15 && music <= 35,
+      `moved to ${music}`,
+    );
+    check(
+      `${name}: Music volume changes immediately`,
+      Math.abs(s.audio.musicVolume - music / 100) < 0.001 && Math.abs(s.audio.musicGain - (music / 100) ** 2) < 0.02,
+      `setting ${s.audio.musicVolume}, music level ${s.audio.musicGain?.toFixed(3)}`,
+    );
+
+    // Effects: drag from the left end up to about three quarters.
+    const beepsBefore = s.audio.counts.beep;
+    await touchDrag(page, cdp, '#sfx-volume', 0.05, 0.73);
+    s = await state(page);
+    const sfx = Number(await page.locator('#sfx-volume').inputValue());
+    check(`${name}: Effects slider follows a finger drag`, sfx >= 62 && sfx <= 84, `moved to ${sfx}`);
+    check(
+      `${name}: Effects volume changes immediately (with a preview beep)`,
+      Math.abs(s.audio.sfxVolume - sfx / 100) < 0.001 && Math.abs(s.audio.sfxGain - (sfx / 100) ** 2) < 0.02 && s.audio.counts.beep > beepsBefore,
+      `setting ${s.audio.sfxVolume}, effects level ${s.audio.sfxGain?.toFixed(3)}`,
+    );
+
+    // Saved on the device: still there after refreshing.
+    await page.reload();
+    await page.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 30000 });
+    s = await state(page);
+    check(
+      `${name}: slider settings are kept after refreshing`,
+      Math.round(s.audio.musicVolume * 100) === music && Math.round(s.audio.sfxVolume * 100) === sfx,
+      `music ${Math.round(s.audio.musicVolume * 100)}, effects ${Math.round(s.audio.sfxVolume * 100)}`,
+    );
+    check(`${name}: no errors`, errors.length === 0, errors.join(' | '));
+    await context.close();
+  }
+
+  // Desktop: dragging with a mouse.
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } });
+  await page.locator('#sound-settings-button').click();
+  const box = await page.locator('#music-volume').boundingBox();
+  const y = box.y + box.height / 2;
+  const before = await page.locator('#music-volume').inputValue();
+  await page.mouse.move(box.x + box.width * 0.1, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, y, { steps: 5 });
+  await page.mouse.move(box.x + box.width * 0.9, y, { steps: 5 });
+  await page.mouse.up();
+  await sleep(250);
+  const after = Number(await page.locator('#music-volume').inputValue());
+  const s = await state(page);
+  check('desktop: Music slider works with a mouse drag', after >= 80 && Math.abs(s.audio.musicVolume - after / 100) < 0.001, `${before} → ${after}`);
+  check('desktop: no errors', errors.length === 0, errors.join(' | '));
+  await context.close();
+}
+
 /** Holds a finger on a button for `ms` milliseconds using real touch events. */
 async function holdTouch(page, cdp, selector, ms) {
   const box = await page.locator(selector).boundingBox();
@@ -522,7 +603,7 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    const sections = { desktopTest, circuitTest, raceTest, audioTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
+    const sections = { desktopTest, circuitTest, raceTest, audioTest, sliderTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
     // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
     for (const [name, run] of Object.entries(sections)) {
       if (!process.env.ONLY || process.env.ONLY === name) await run(browser);

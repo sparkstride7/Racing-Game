@@ -211,6 +211,8 @@ export class GameAudio {
       musicVolume: m.settings.musicVolume,
       sfxVolume: m.settings.sfxVolume,
       masterGain: m.isReady ? m.master.gain.value : null,
+      musicGain: m.isReady ? m.music.gain.value : null,
+      sfxGain: m.isReady ? m.sfx.gain.value : null,
       musicPlaying: this.music?.playing ?? false,
       engineFrequency: this.engine?.frequency ?? 0,
       engineLevel: this.engine?.level ?? 0,

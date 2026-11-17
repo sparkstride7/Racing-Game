@@ -30,6 +30,10 @@ export class SoundControls {
     });
     this.toggle.addEventListener('click', () => this.setMuted(!audio.settings.muted));
 
+    // Finger and pen drags are handled directly, so the sliders work on iPhone Safari however it treats touches.
+    followFinger(this.music);
+    followFinger(this.sfx);
+
     this.music.addEventListener('input', () => audio.setMusicVolume(Number(this.music.value) / 100));
     this.sfx.addEventListener('input', () => {
       audio.setSfxVolume(Number(this.sfx.value) / 100);
@@ -58,4 +62,43 @@ export class SoundControls {
     this.music.value = String(Math.round(musicVolume * 100));
     this.sfx.value = String(Math.round(sfxVolume * 100));
   }
+}
+
+/**
+ * Makes a range slider follow a finger (or pen) directly: touching or dragging anywhere on it sets the value
+ * to that position. Mouse use is left to the browser's normal slider behaviour.
+ */
+function followFinger(slider: HTMLInputElement) {
+  let activePointer: number | null = null;
+  const setFromX = (clientX: number) => {
+    const rect = slider.getBoundingClientRect();
+    const min = Number(slider.min || 0);
+    const max = Number(slider.max || 100);
+    const step = Number(slider.step || 1);
+    // The thumb's centre can't reach the very ends of the track, so leave half a thumb at each side.
+    const inset = Math.min(14, rect.width / 4);
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left - inset) / (rect.width - inset * 2)));
+    const value = Math.round((min + ratio * (max - min)) / step) * step;
+    if (String(value) !== slider.value) {
+      slider.value = String(value);
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+  slider.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    e.preventDefault();
+    activePointer = e.pointerId;
+    slider.setPointerCapture?.(e.pointerId);
+    setFromX(e.clientX);
+  });
+  slider.addEventListener('pointermove', (e) => {
+    if (e.pointerId === activePointer) setFromX(e.clientX);
+  });
+  const release = (e: PointerEvent) => {
+    if (e.pointerId !== activePointer) return;
+    activePointer = null;
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  slider.addEventListener('pointerup', release);
+  slider.addEventListener('pointercancel', release);
 }

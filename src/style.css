@@ -794,6 +794,9 @@ body.touch #sound-button {
 .sound-row input[type='range'] {
   flex: 1;
   min-width: 0;
+  /* The slider handles finger drags itself (see SoundControls), so the browser shouldn't try to scroll. */
+  touch-action: none;
+  cursor: pointer;
   max-width: 190px;
   accent-color: var(--accent);
   height: 28px;
