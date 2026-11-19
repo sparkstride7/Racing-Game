@@ -33,8 +33,10 @@ export interface CarStyle {
   rim: number;
   caliper: number;
   finish: 'metallic' | 'gloss' | 'matte';
-  /** Race number shown on the roof and doors (none for the player's car). */
+  /** Race number shown on the roof and doors. */
   number?: number;
+  /** Which 3D car model to use when the model files are loaded (the built-in car is used otherwise). */
+  body?: 'exotic' | 'gt';
 }
 
 /** The player's original car. */
@@ -45,6 +47,15 @@ export const PLAYER_STYLE: CarStyle = {
   rim: 0xb9bec6,
   caliper: 0xf5c400,
   finish: 'metallic',
+  number: 7,
+  body: 'exotic',
+};
+
+/** Paint finishes, shared by the built-in car and the 3D model cars. */
+export const PAINT_FINISH = {
+  metallic: { metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 },
+  gloss: { metalness: 0.1, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.04 },
+  matte: { metalness: 0.2, roughness: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.5 },
 };
 
 /**
@@ -98,11 +109,7 @@ export function createCarModel(style: CarStyle = PLAYER_STYLE): CarModel {
 }
 
 function createMaterials(style: CarStyle) {
-  const finish = {
-    metallic: { metalness: 0.55, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.06 },
-    gloss: { metalness: 0.1, roughness: 0.25, clearcoat: 1, clearcoatRoughness: 0.04 },
-    matte: { metalness: 0.2, roughness: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.5 },
-  }[style.finish];
+  const finish = PAINT_FINISH[style.finish];
   return {
     paint: new THREE.MeshPhysicalMaterial({ color: style.paint, ...finish }),
     accent: new THREE.MeshPhysicalMaterial({ color: style.accent, ...finish }),
@@ -301,6 +308,30 @@ function createWheelGeometries(): Record<WheelPart, THREE.BufferGeometry> {
 
 /** White roundels with the car's number on the roof and both doors (one mesh). */
 function createNumberDecals(number: number) {
+  const texture = createNumberTexture(number);
+
+  const geometry = mergeAll([
+    new THREE.PlaneGeometry(0.62, 0.62).rotateX(-Math.PI / 2).rotateY(Math.PI / 2).translate(0, 1.372, -0.15),
+    new THREE.PlaneGeometry(0.5, 0.5).rotateY(Math.PI / 2).translate(BODY_WIDTH / 2 + 0.012, 0.6, -0.05),
+    new THREE.PlaneGeometry(0.5, 0.5).rotateY(-Math.PI / 2).translate(-BODY_WIDTH / 2 - 0.012, 0.6, -0.05),
+  ]);
+  return new THREE.Mesh(geometry, createNumberMaterial(texture));
+}
+
+/** Material for race-number roundels (drawn just in front of the paint). */
+export function createNumberMaterial(texture: THREE.Texture) {
+  return new THREE.MeshStandardMaterial({
+    map: texture,
+    alphaTest: 0.5,
+    roughness: 0.4,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+}
+
+/** A white roundel with a black race number, as a texture. */
+export function createNumberTexture(number: number) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 128;
   const ctx = canvas.getContext('2d')!;
@@ -315,24 +346,7 @@ function createNumberDecals(number: number) {
   ctx.fillText(String(number), 64, 70);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-
-  const geometry = mergeAll([
-    new THREE.PlaneGeometry(0.62, 0.62).rotateX(-Math.PI / 2).rotateY(Math.PI / 2).translate(0, 1.372, -0.15),
-    new THREE.PlaneGeometry(0.5, 0.5).rotateY(Math.PI / 2).translate(BODY_WIDTH / 2 + 0.012, 0.6, -0.05),
-    new THREE.PlaneGeometry(0.5, 0.5).rotateY(-Math.PI / 2).translate(-BODY_WIDTH / 2 - 0.012, 0.6, -0.05),
-  ]);
-  const decals = new THREE.Mesh(
-    geometry,
-    new THREE.MeshStandardMaterial({
-      map: texture,
-      alphaTest: 0.5,
-      roughness: 0.4,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-    }),
-  );
-  return decals;
+  return texture;
 }
 
 /** Merges geometries, converting them all to the same (non-indexed) layout first. */

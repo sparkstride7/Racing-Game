@@ -5,6 +5,8 @@ import { CAR } from '../config';
 import type { DriveControls } from '../input/Input';
 import { clamp, lerp, moveTowards } from '../utils/math';
 import { createCarModel, type CarModel, type CarStyle, MODEL_GROUND_OFFSET, PLAYER_STYLE } from './CarModel';
+import { getCarTemplate } from './carAssets';
+import { GlbCarModel } from './GlbCarModel';
 
 /** Wheel order used everywhere: front-left, front-right, rear-left, rear-right. */
 const WHEELS = [
@@ -29,7 +31,10 @@ export class Car {
   readonly object = new THREE.Group();
   readonly body: RigidBody;
   private readonly vehicle: DynamicRayCastVehicleController;
-  private readonly model: CarModel;
+  /** The built-in car (used when the 3D model files are not loaded), or null. */
+  private readonly model: CarModel | null = null;
+  /** The 3D model car with its three detail levels, or null. */
+  private readonly glb: GlbCarModel | null = null;
 
   private steerAngle = 0;
   private upsideDownTime = 0;
@@ -95,11 +100,24 @@ export class Car {
       this.vehicle.setWheelFrictionSlip(i, w.front ? CAR.frontGrip : CAR.rearGrip);
     });
 
-    // 3D model. The body model sits lower than the physics origin (which is at axle height + suspension).
-    this.model = createCarModel(style);
-    this.model.body.position.y = -MODEL_GROUND_OFFSET;
-    this.object.add(this.model.body);
-    this.model.wheels.forEach((wheel) => this.object.add(wheel.pivot));
+    // 3D model. It sits lower than the physics origin (which is at axle height + suspension).
+    // Use the loaded model file for this car's body if there is one, otherwise the built-in car.
+    const template = getCarTemplate(style.body ?? 'exotic');
+    if (template) {
+      this.glb = new GlbCarModel(template, style);
+      this.glb.root.position.y = -MODEL_GROUND_OFFSET;
+      this.object.add(this.glb.root);
+    } else {
+      this.model = createCarModel(style);
+      this.model.body.position.y = -MODEL_GROUND_OFFSET;
+      this.object.add(this.model.body);
+      this.model.wheels.forEach((wheel) => this.object.add(wheel.pivot));
+    }
+  }
+
+  /** Which 3D model this car shows ('model' = loaded model file, 'built-in' = code-built car), and its detail level. */
+  get visualInfo() {
+    return this.glb ? { kind: 'model' as const, level: this.glb.currentLevel } : { kind: 'built-in' as const, level: 0 };
   }
 
   /** Places the car (used at the start and when resetting). */
@@ -221,6 +239,7 @@ export class Car {
   dispose(world: World) {
     world.removeVehicleController(this.vehicle);
     world.removeRigidBody(this.body);
+    this.glb?.dispose();
   }
 
   /** Called after each physics step. */
@@ -234,12 +253,27 @@ export class Car {
     this.object.quaternion.slerpQuaternions(this.prevQuat, this.currQuat, alpha);
 
     // Wheels follow the suspension, steering and spin from the physics.
-    this.model.wheels.forEach((wheel, i) => {
+    for (let i = 0; i < 4; i++) {
       const suspension = this.vehicle.wheelSuspensionLength(i) ?? CAR.suspensionRestLength;
-      wheel.pivot.position.set(WHEELS[i].x, -suspension, WHEELS[i].z);
-      wheel.pivot.rotation.y = this.vehicle.wheelSteering(i) ?? 0;
-      wheel.spin.rotation.x = this.vehicle.wheelRotation(i) ?? 0;
-    });
+      const steering = this.vehicle.wheelSteering(i) ?? 0;
+      const rotation = this.vehicle.wheelRotation(i) ?? 0;
+      if (this.model) {
+        const wheel = this.model.wheels[i];
+        wheel.pivot.position.set(WHEELS[i].x, -suspension, WHEELS[i].z);
+        wheel.pivot.rotation.y = steering;
+        wheel.spin.rotation.x = rotation;
+      }
+      if (this.glb) {
+        // The model's wheel pivots live inside the model, which is lowered by MODEL_GROUND_OFFSET; add it back.
+        // All three detail levels are updated so whichever one the renderer shows is correct.
+        for (const wheels of this.glb.levelWheels) {
+          const wheel = wheels[i];
+          wheel.pivot.position.set(WHEELS[i].x, MODEL_GROUND_OFFSET - suspension, WHEELS[i].z);
+          wheel.pivot.rotation.y = steering;
+          wheel.spin.rotation.x = rotation;
+        }
+      }
+    }
   }
 
   private storePose() {

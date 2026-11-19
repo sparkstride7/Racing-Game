@@ -68,6 +68,12 @@ export const CAR = {
   spawnHeight: 1.0,
 };
 
+/**
+ * Rendering layers. Objects on the shadow-only layer are drawn into the sun's shadow map but never on screen
+ * (each 3D model car casts its shadow from its light LOD2 copy, which halves the cost of a nearby car).
+ */
+export const LAYERS = { shadowOnly: 1 };
+
 export const CAMERA = {
   fov: 62,
   /** Extra field of view at top speed, for a sense of speed. */

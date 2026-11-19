@@ -478,6 +478,11 @@ body:not(.playing) #touch-controls {
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.6);
 }
+.standings .car-no {
+  font-size: 0.85em;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
 .standings .done {
   margin-left: auto;
   font-size: 11px;
@@ -808,6 +813,20 @@ body.touch #sound-button {
 .btn.toggle[aria-pressed='true'] {
   background: var(--accent);
   border-color: transparent;
+}
+/* Shown on the start screen when the 3D car models could not be loaded and the built-in cars are used. */
+.cars-note {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(10, 12, 16, 0.6);
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffd23f;
+}
+.cars-note[hidden] {
+  display: none;
 }
 .sound-status {
   margin: 8px 0 0;

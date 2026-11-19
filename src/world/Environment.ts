@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { LAYERS } from '../config';
 
 export interface EnvironmentOptions {
   shadowMapSize: number;
@@ -46,6 +47,7 @@ export class Environment {
     // The sun.
     this.sun = new THREE.DirectionalLight(0xfff0dc, 2.5);
     this.sun.castShadow = true;
+    this.sun.shadow.camera.layers.enable(LAYERS.shadowOnly); // shadow-only copies of the cars
     this.sun.shadow.mapSize.set(options.shadowMapSize, options.shadowMapSize);
     const c = this.sun.shadow.camera;
     c.left = -40;

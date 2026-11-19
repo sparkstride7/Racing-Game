@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ChaseCamera } from '../camera/ChaseCamera';
 import { CAR } from '../config';
+import { loadCarAssets } from '../vehicle/loadCarAssets';
 import { Input, type DriveControls } from '../input/Input';
 import { GameAudio } from '../audio/GameAudio';
 import { Race } from '../race/Race';
@@ -41,6 +42,8 @@ export class Game {
   private readonly raceLaps = Number(new URLSearchParams(location.search).get('laps')) || undefined;
   private readonly timer = new THREE.Timer();
   private fps = 60;
+  /** True when the 3D car model files loaded (otherwise the built-in cars are used). */
+  private carModelsLoaded = false;
 
   constructor(container: HTMLElement) {
     this.isTouch = detectTouch();
@@ -65,6 +68,12 @@ export class Game {
       shadowMapSize: this.isTouch ? 1024 : 2048,
     });
     this.track = new Circuit(this.scene, this.physics.world);
+
+    // 3D car models (with three detail levels). If they cannot be loaded, or ?cars=builtin is in the address,
+    // the built-in cars are used instead, so the game always starts.
+    if (new URLSearchParams(location.search).get('cars') !== 'builtin') this.carModelsLoaded = await loadCarAssets();
+    // Let the player know the simpler built-in cars are in use (downloads failed, timed out, or ?cars=builtin).
+    document.getElementById('cars-note')?.toggleAttribute('hidden', this.carModelsLoaded);
 
     this.car = new Car(this.physics.world);
     this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading);
@@ -216,6 +225,11 @@ export class Game {
           barrierOffset: this.track.barrierOffset,
           drawCalls: this.renderer.info.render.calls,
           triangles: this.renderer.info.render.triangles,
+          carModels: {
+            loaded: this.carModelsLoaded,
+            player: this.car.visualInfo,
+            cars: race ? race.racers.map((r) => ({ name: r.name, ...r.car.visualInfo })) : [{ name: 'You', ...this.car.visualInfo }],
+          },
         };
       },
       /** Test helper: puts the car on the centre line at `fraction` (0..1) of the way round the lap. */

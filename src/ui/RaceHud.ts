@@ -31,7 +31,7 @@ export class RaceHud {
     this.standings.replaceChildren();
     this.rows = race.racers.map(() => {
       const li = document.createElement('li');
-      li.innerHTML = '<span class="num"></span><span class="dot"></span><span class="name"></span><span class="done"></span>';
+      li.innerHTML = '<span class="num"></span><span class="dot"></span><span class="name"></span><span class="car-no"></span><span class="done"></span>';
       this.standings.appendChild(li);
       return li;
     });
@@ -74,7 +74,9 @@ export class RaceHud {
       (li.children[0] as HTMLElement).textContent = String(i + 1);
       (li.children[1] as HTMLElement).style.background = cssColor(racer.style.paint);
       (li.children[2] as HTMLElement).textContent = racer.name;
-      (li.children[3] as HTMLElement).textContent = racer.finishTime !== null ? '🏁' : '';
+      // Race number shown on the car (e.g. "#1"), next to the driver's name.
+      (li.children[3] as HTMLElement).textContent = racer.style.number !== undefined ? `#${racer.style.number}` : '';
+      (li.children[4] as HTMLElement).textContent = racer.finishTime !== null ? '🏁' : '';
     });
 
     if (race.phase === 'finished' && !this.resultsShown) {
