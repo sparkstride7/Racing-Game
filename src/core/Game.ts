@@ -6,9 +6,12 @@ import { Input, type DriveControls } from '../input/Input';
 import { GameAudio } from '../audio/GameAudio';
 import { Race } from '../race/Race';
 import { Hud, type GameMode } from '../ui/Hud';
+import { MiniMap } from '../ui/MiniMap';
+import { PauseMenu } from '../ui/PauseMenu';
 import { RaceHud } from '../ui/RaceHud';
 import { SoundControls } from '../ui/SoundControls';
 import { Car } from '../vehicle/Car';
+import { PLAYER_STYLE } from '../vehicle/CarModel';
 import { Environment } from '../world/Environment';
 import { Circuit } from '../world/Circuit';
 import { Physics } from './Physics';
@@ -36,6 +39,12 @@ export class Game {
 
   private started = false;
   private mode: GameMode | null = null;
+  /** True while the pause menu is open: nothing moves and no race time passes. */
+  private paused = false;
+  /** Set when the screen size changes while paused, so the frozen picture is drawn again at the new size. */
+  private redrawWhilePaused = false;
+  private pauseMenu!: PauseMenu;
+  private miniMap!: MiniMap;
   private race: Race | null = null;
   private raceHud!: RaceHud;
   /** Race length override for testing (add ?laps=1 to the address). */
@@ -83,7 +92,7 @@ export class Game {
 
     this.input = new Input(document.getElementById('touch-controls')!, this.isTouch);
     this.input.onReset(() => {
-      if (!this.started) return;
+      if (!this.started || this.paused) return;
       // In a race, put the car back on the track where it is; in free drive, back on the grid.
       if (this.race) {
         if (this.race.time > 0 && this.race.player.finishTime === null) this.race.recover(this.race.player);
@@ -91,11 +100,21 @@ export class Game {
     });
 
     this.raceHud = new RaceHud();
+    this.miniMap = new MiniMap(document.getElementById('minimap') as HTMLCanvasElement, this.track.path, this.track.startLineDistance);
     this.raceHud.onResultsButtons(
       () => this.startMode('race'),
       () => this.showMenu(),
     );
-    this.hud.onMenuButton(() => this.showMenu());
+    this.pauseMenu = new PauseMenu({
+      pause: () => this.pause(),
+      resume: () => this.resume(),
+      restart: () => this.startMode(this.mode ?? 'race'),
+      mainMenu: () => this.showMenu(),
+    });
+    // Leaving the game (switching apps, locking the phone, a phone call) pauses it.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.pause();
+    });
     new SoundControls(this.audio.manager);
 
     window.addEventListener('resize', () => this.onResize());
@@ -108,6 +127,7 @@ export class Game {
 
   /** Shows the main menu (race or free drive). */
   showMenu() {
+    this.unpause();
     this.endRace();
     this.started = false;
     this.mode = null;
@@ -120,16 +140,38 @@ export class Game {
   startMode(mode: GameMode) {
     // Called from the player's tap/click/key press, so sound is allowed to start now.
     this.audio.unlock();
+    this.unpause();
     this.endRace();
     this.mode = mode;
     this.started = true;
     if (mode === 'race') {
       this.race = new Race(this.physics.world, this.scene, this.track, this.car, this.raceLaps);
       this.raceHud.show(this.race);
+      this.miniMap.setCars(
+        this.race.racers.map((r) => ({ name: r.name, object: r.car.object, colour: r.style.paint, isPlayer: r.isPlayer })),
+      );
     } else {
       this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading);
+      this.miniMap.setCars([{ name: 'You', object: this.car.object, colour: PLAYER_STYLE.paint, isPlayer: true }]);
     }
     this.chaseCamera.startChase();
+  }
+
+  /** Freezes the game and opens the pause menu (only while driving). */
+  pause() {
+    if (!this.started || this.paused) return;
+    this.paused = true;
+    this.pauseMenu.open(this.mode ?? 'race');
+  }
+
+  /** Closes the pause menu; everything carries on exactly where it stopped. */
+  resume() {
+    this.unpause();
+  }
+
+  private unpause() {
+    this.paused = false;
+    this.pauseMenu.close();
   }
 
   private endRace() {
@@ -142,6 +184,18 @@ export class Game {
   private frame(time: number) {
     this.timer.update(time);
     const dt = Math.min(this.timer.getDelta(), 0.1);
+
+    if (this.paused) {
+      // Frozen: no physics steps, so the cars, the race clock, laps and positions all stand still.
+      // The last picture stays on screen; it is only drawn again if the screen size changes.
+      this.audio.update({ dt, playerCar: this.car, throttle: 0, driving: true, paused: true, race: this.race });
+      if (this.redrawWhilePaused) {
+        this.redrawWhilePaused = false;
+        this.renderer.render(this.scene, this.chaseCamera.camera);
+      }
+      return;
+    }
+
     if (dt > 0) this.fps += (1 / dt - this.fps) * 0.05;
 
     const controls = this.started ? this.input.read() : NO_INPUT;
@@ -167,13 +221,14 @@ export class Game {
       race.render(alpha);
       this.raceHud.update(race);
     } else this.car.render(alpha);
+    if (this.started) this.miniMap.draw();
 
     const speed = this.car.forwardSpeed;
     this.chaseCamera.update(this.car.object, speed, dt);
     this.environment.update(this.car.object.position);
     this.hud.setSpeed(this.car.speedKmh, Math.abs(speed) / CAR.topSpeed);
 
-    this.audio.update({ dt, playerCar: this.car, throttle: controls.throttle, driving: this.started, race: this.race });
+    this.audio.update({ dt, playerCar: this.car, throttle: controls.throttle, driving: this.started, paused: false, race: this.race });
 
     this.renderer.render(this.scene, this.chaseCamera.camera);
   }
@@ -183,6 +238,7 @@ export class Game {
     const h = window.innerHeight;
     this.renderer.setSize(w, h);
     this.chaseCamera.setAspect(w / h);
+    this.redrawWhilePaused = true;
   }
 
   /** Lets automated tests read what is happening in the game. */
@@ -196,6 +252,7 @@ export class Game {
         return {
           started: this.started,
           mode: this.mode,
+          paused: this.paused,
           race: race
             ? {
                 phase: race.phase,
@@ -212,6 +269,10 @@ export class Game {
                   finished: r.finishTime !== null,
                   x: r.car.body.translation().x,
                   z: r.car.body.translation().z,
+                  // Where the car is drawn this frame, and which way it points (for the mini-map tests).
+                  shownX: r.car.object.position.x,
+                  shownZ: r.car.object.position.z,
+                  heading: headingOf(r.car.object),
                 })),
               }
             : null,
@@ -225,6 +286,7 @@ export class Game {
           barrierOffset: this.track.barrierOffset,
           drawCalls: this.renderer.info.render.calls,
           triangles: this.renderer.info.render.triangles,
+          miniMap: this.miniMap.debugState(),
           carModels: {
             loaded: this.carModelsLoaded,
             player: this.car.visualInfo,
@@ -254,6 +316,12 @@ export class Game {
       },
     };
   }
+}
+
+/** Which way an object faces, as an angle in the ground plane (0 = +Z). */
+function headingOf(object: THREE.Object3D) {
+  const f = new THREE.Vector3(0, 0, 1).applyQuaternion(object.quaternion);
+  return Math.atan2(f.x, f.z);
 }
 
 /** True on phones and tablets. Add ?touch=1 or ?touch=0 to the address to force it. */

@@ -37,6 +37,9 @@
       <ol id="standings" class="standings"></ol>
     </div>
 
+    <!-- Mini-map: the whole circuit with every car on it (shown while driving) -->
+    <canvas id="minimap" role="img" aria-label="Track map showing every car"></canvas>
+
     <!-- Big centre text: 3, 2, 1, GO! and "FINAL LAP" -->
     <div id="countdown" aria-live="assertive"></div>
 
@@ -49,9 +52,9 @@
       </svg>
     </button>
 
-    <!-- Back to the main menu (shown while driving) -->
-    <button id="menu-button" hidden aria-label="Main menu">
-      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+    <!-- Pause (shown while driving): freezes the game and opens the pause menu -->
+    <button id="pause-button" hidden aria-label="Pause">
+      <svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" /></svg>
     </button>
 
     <!-- Race results -->
@@ -116,7 +119,7 @@
         </div>
         <button id="sound-settings-button" class="btn small" hidden>🔊 Sound settings</button>
         <p id="help-keyboard" class="help">
-          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc</b> menu &nbsp; <b>M</b> sound on/off<br />
+          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc / P</b> pause &nbsp; <b>M</b> sound on/off<br />
           <b>W / ↑</b> accelerate &nbsp; <b>S / ↓</b> brake &amp; reverse &nbsp; <b>A D / ← →</b> steer<br />
           <b>Space</b> handbrake &nbsp; <b>R</b> reset car
         </p>
@@ -124,6 +127,29 @@
           Left thumb: steer · Right thumb: gas &amp; brake<br />
           <span class="rotate-hint">Turn your phone sideways for the best view</span>
         </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause menu: everything is frozen while it is open -->
+    <div id="pause-menu" hidden>
+      <div class="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <div id="pause-main">
+          <h2 id="pause-title">Paused</h2>
+          <div class="pause-buttons">
+            <button id="pause-resume" class="btn primary">Resume</button>
+            <button id="pause-restart" class="btn">Restart Race</button>
+            <button id="pause-settings" class="btn">Settings</button>
+            <button id="pause-main-menu" class="btn">Main Menu</button>
+          </div>
+        </div>
+        <div id="pause-confirm" hidden>
+          <h2 id="confirm-title">Restart the race?</h2>
+          <p id="confirm-text" class="confirm-text">Your progress in this race will be lost.</p>
+          <div class="pause-buttons two">
+            <button id="confirm-cancel" class="btn">Cancel</button>
+            <button id="confirm-ok" class="btn primary">Restart</button>
+          </div>
         </div>
       </div>
     </div>

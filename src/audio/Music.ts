@@ -42,7 +42,11 @@ export class Music {
   private timer: number | null = null;
   private nextTime = 0;
   private step = 0;
+  /** The music's current volume level (lower after the finish). */
+  private level = 0.55;
   playing = false;
+  /** True while the game is paused: silent, and continues from the same beat on resume. */
+  paused = false;
 
   constructor(private readonly audio: AudioManager) {
     this.out = audio.ctx!.createGain();
@@ -55,9 +59,11 @@ export class Music {
     const ctx = this.audio.ctx!;
     this.stopTimer();
     this.step = 0;
+    this.paused = false;
+    this.level = 0.55;
     this.nextTime = ctx.currentTime + 0.05;
     this.out.gain.cancelScheduledValues(ctx.currentTime);
-    this.out.gain.setTargetAtTime(0.55, ctx.currentTime, 0.05);
+    this.out.gain.setTargetAtTime(this.level, ctx.currentTime, 0.05);
     this.playing = true;
     this.schedule();
     this.timer = window.setInterval(() => this.schedule(), 25);
@@ -65,13 +71,37 @@ export class Music {
 
   /** Turns the music down (e.g. after the finish line) without stopping it. */
   duck(level = 0.25) {
-    this.out.gain.setTargetAtTime(0.55 * level, this.audio.ctx!.currentTime, 0.6);
+    this.level = 0.55 * level;
+    if (!this.paused) this.out.gain.setTargetAtTime(this.level, this.audio.ctx!.currentTime, 0.6);
+  }
+
+  /** Silences the music and stops it moving on (game paused). */
+  pause() {
+    if (!this.playing || this.paused) return;
+    this.paused = true;
+    this.stopTimer();
+    const t = this.audio.ctx!.currentTime;
+    this.out.gain.cancelScheduledValues(t);
+    this.out.gain.setTargetAtTime(0, t, 0.03);
+  }
+
+  /** Carries on from the beat where it was paused. */
+  resume() {
+    if (!this.playing || !this.paused) return;
+    this.paused = false;
+    const ctx = this.audio.ctx!;
+    this.nextTime = ctx.currentTime + 0.05;
+    this.out.gain.cancelScheduledValues(ctx.currentTime);
+    this.out.gain.setTargetAtTime(this.level, ctx.currentTime, 0.05);
+    this.schedule();
+    this.timer = window.setInterval(() => this.schedule(), 25);
   }
 
   /** Fades out and stops. */
   stop() {
     if (!this.playing) return;
     this.playing = false;
+    this.paused = false;
     this.out.gain.setTargetAtTime(0, this.audio.ctx!.currentTime, 0.25);
     this.stopTimer();
   }

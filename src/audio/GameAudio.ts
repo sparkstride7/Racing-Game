@@ -16,6 +16,8 @@ export interface AudioFrame {
   throttle: number;
   /** True while driving (not on the menu). */
   driving: boolean;
+  /** True while the pause menu is open: everything goes quiet and nothing moves on. */
+  paused: boolean;
   race: Race | null;
 }
 
@@ -47,6 +49,7 @@ export class GameAudio {
   private lastCountdown = '';
   private musicStarted = false;
   private finished = false;
+  private paused = false;
 
   private readonly tmpV = new THREE.Vector3();
   private readonly tmpP = new THREE.Vector3();
@@ -73,6 +76,7 @@ export class GameAudio {
     this.rivalEngine?.silence();
     this.tires?.silence();
     this.music?.stop();
+    this.paused = false;
     this.race = null;
     this.trackers.clear();
   }
@@ -93,7 +97,24 @@ export class GameAudio {
       this.musicStarted = false;
       this.finished = false;
       this.trackers.clear();
-      if (!race) this.music!.stop();
+      // Leaving a race, or restarting from the pause menu: no paused music left over.
+      if (!race || this.music!.paused) this.music!.stop();
+    }
+
+    // --- Paused: engines and tyres silent, music held where it is. ---
+    if (frame.paused) {
+      if (!this.paused) {
+        this.paused = true;
+        this.engine.silence();
+        this.rivalEngine!.silence();
+        this.tires!.silence();
+        this.music!.pause();
+      }
+      return;
+    }
+    if (this.paused) {
+      this.paused = false;
+      this.music!.resume();
     }
 
     // --- Engine and tyres of the player's car. ---
@@ -215,6 +236,7 @@ export class GameAudio {
       musicGain: m.isReady ? m.music.gain.value : null,
       sfxGain: m.isReady ? m.sfx.gain.value : null,
       musicPlaying: this.music?.playing ?? false,
+      musicPaused: this.music?.paused ?? false,
       engineFrequency: this.engine?.frequency ?? 0,
       engineLevel: this.engine?.level ?? 0,
       squeal: this.tires?.level ?? 0,

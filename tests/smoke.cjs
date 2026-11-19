@@ -230,8 +230,7 @@ async function raceTest(browser) {
   s = await state(page);
   check('"Race again" restarts with the countdown', s.race && s.race.phase === 'countdown' && s.race.cars.length === 6 && !(await page.locator('#results').isVisible()));
 
-  await page.locator('#menu-button').click();
-  await drive(page, 0.3);
+  await leaveToMenu(page, false);
   await page.keyboard.press('KeyF');
   await drive(page, 1);
   s = await state(page);
@@ -264,7 +263,8 @@ const HUD_PARTS = {
   'position panel': '#race-hud .race-card',
   'running order': '#standings',
   speedometer: '#hud .speedo',
-  'menu button': '#menu-button',
+  'pause button': '#pause-button',
+  'mini-map': '#minimap',
   'sound button': '#sound-button',
   'reset button': '#touch-controls .reset',
   'steering buttons': '#touch-controls .cluster.left',
@@ -293,8 +293,7 @@ async function hudLayoutTest(browser) {
     await page.locator('#sound-done').tap();
     for (const mode of ['race', 'free']) {
       if (mode === 'free') {
-        await page.locator('#menu-button').tap();
-        await sleep(300);
+        await leaveToMenu(page, true);
       }
       await page.locator(mode === 'race' ? '#mode-race' : '#mode-free').tap();
       await sleep(600);
@@ -335,6 +334,338 @@ async function hudLayoutTest(browser) {
       await page.screenshot({ path: path.join(OUT, file) });
       check(`${name} (${vp.width}×${vp.height}) ${mode}: panels don't overlap and fit on screen`, problems.length === 0, problems.join('; '));
     }
+    await context.close();
+  }
+}
+
+/** Pause → Main Menu → "Leave": back to the main menu (by touch with `tap`, otherwise by mouse). */
+async function leaveToMenu(page, tap) {
+  const press = (selector) => (tap ? page.locator(selector).tap() : page.locator(selector).click());
+  await press('#pause-button');
+  await press('#pause-main-menu');
+  await press('#confirm-ok');
+  await page.locator('#mode-race').waitFor({ state: 'visible' });
+  await sleep(300);
+}
+
+/** Everything that must stand completely still while the game is paused. */
+function frozenSnapshot(s) {
+  return JSON.stringify({
+    simTime: s.simTime,
+    race: s.race && { phase: s.race.phase, time: s.race.time, countdown: s.race.countdown, lap: s.race.lap, position: s.race.position, cars: s.race.cars },
+    position: s.position,
+    speedKmh: s.speedKmh,
+  });
+}
+
+async function pauseTest(browser) {
+  console.log('\n— Pause menu (desktop) —');
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
+  const visible = (selector) => page.locator(selector).isVisible();
+  await page.keyboard.press('Enter');
+  await drive(page, 1.2);
+  check('pause button is shown while racing', await visible('#pause-button'));
+
+  // 1. Pause during the countdown: the countdown stops too.
+  await page.locator('#pause-button').click();
+  await sleep(150);
+  let a = await state(page);
+  await sleep(1500);
+  let b = await state(page);
+  check('pausing during the countdown freezes it', a.paused && b.paused && a.race.phase === 'countdown' && frozenSnapshot(a) === frozenSnapshot(b), `race clock ${a.race.time.toFixed(2)} → ${b.race.time.toFixed(2)} s`);
+  const labels = await page.locator('#pause-main .btn').allTextContents();
+  check('pause menu shows Resume, Restart Race, Settings, Main Menu', (await visible('#pause-menu')) && labels.join('|') === 'Resume|Restart Race|Settings|Main Menu', labels.join(', '));
+  check('pause button hidden while the menu is open', !(await visible('#pause-button')));
+  await page.screenshot({ path: path.join(OUT, 'pause-1-countdown.png') });
+  await page.locator('#pause-resume').click();
+  await drive(page, 0.2);
+  b = await state(page);
+  check('Resume continues the countdown', !b.paused && b.race.time > a.race.time && b.race.time < a.race.time + 0.6 && !(await visible('#pause-menu')), `race clock ${a.race.time.toFixed(2)} → ${b.race.time.toFixed(2)} s`);
+
+  // 2. Pause mid-race (Esc key) with everything moving.
+  await page.keyboard.down('ArrowUp');
+  while ((await state(page)).race.time < 0.05) await sleep(40);
+  await drive(page, 4);
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  a = await state(page);
+  const timeText = await page.locator('#race-time').textContent();
+  await sleep(2000);
+  b = await state(page);
+  const moving = a.race.cars.filter((c) => c.speedKmh > 30).length;
+  check('Esc pauses the race', a.paused && (await visible('#pause-menu')));
+  check('paused: player, opponents, race clock, laps and positions all frozen', frozenSnapshot(a) === frozenSnapshot(b), `${moving} cars were moving; clock ${a.race.time.toFixed(2)} → ${b.race.time.toFixed(2)} s`);
+  check('paused: on-screen race time stops', (await page.locator('#race-time').textContent()) === timeText, timeText);
+  if (b.audio.ready) {
+    check('paused: engine silent and music held', b.audio.engineLevel === 0 && b.audio.musicPaused === true, `engine ${b.audio.engineLevel}, music paused ${b.audio.musicPaused}`);
+  }
+  await page.keyboard.press('KeyR'); // reset key must do nothing while paused
+  await sleep(200);
+  check('reset key does nothing while paused', frozenSnapshot(await state(page)) === frozenSnapshot(a));
+  await page.screenshot({ path: path.join(OUT, 'pause-2-racing.png') });
+
+  // 3. Resume (Esc again): carries on from exactly the same moment.
+  await page.keyboard.press('Escape');
+  const c = await state(page);
+  await drive(page, 0.5);
+  const d = await state(page);
+  const me = (s) => s.race.cars.find((x) => x.name === 'You');
+  check('Resume starts from exactly where it paused', !c.paused && c.race.time - a.race.time < 0.2 && Math.abs(me(c).distance - me(a).distance) < 4, `clock ${a.race.time.toFixed(2)} → ${c.race.time.toFixed(2)} s, distance ${me(a).distance.toFixed(1)} → ${me(c).distance.toFixed(1)} m`);
+  check('after Resume: speeds kept and the race moves on', d.race.time > c.race.time && Math.abs(me(c).speedKmh - me(a).speedKmh) < 15 && me(d).distance > me(c).distance, `${me(a).speedKmh.toFixed(0)} → ${me(c).speedKmh.toFixed(0)} km/h`);
+  if (d.audio.ready) check('after Resume: music playing again', d.audio.musicPlaying && !d.audio.musicPaused);
+  await page.keyboard.up('ArrowUp');
+
+  // 4. Restart asks first; Cancel keeps the race.
+  await page.keyboard.press('KeyP');
+  await sleep(150);
+  a = await state(page);
+  await page.locator('#pause-restart').click();
+  check('Restart Race asks for confirmation', (await visible('#pause-confirm')) && (await page.locator('#confirm-title').textContent()) === 'Restart the race?');
+  await page.screenshot({ path: path.join(OUT, 'pause-3-confirm-restart.png') });
+  await page.locator('#confirm-cancel').click();
+  b = await state(page);
+  check('Cancel keeps the race paused and unchanged', b.paused && (await visible('#pause-main')) && frozenSnapshot(a) === frozenSnapshot(b));
+  await page.locator('#pause-restart').click();
+  await page.locator('#confirm-ok').click();
+  await drive(page, 0.3);
+  b = await state(page);
+  check('confirmed Restart starts the race again from the grid', !b.paused && b.race.phase === 'countdown' && b.race.time < -3 && b.race.cars.every((x) => x.distance < 5) && !(await visible('#pause-menu')) && (await visible('#pause-button')));
+
+  // 5. Settings opens the sound settings on top; Done returns to the pause menu.
+  await page.locator('#pause-button').click();
+  await page.locator('#pause-settings').click();
+  await sleep(200);
+  const card = await page.locator('.sound-card').boundingBox();
+  const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('#sound-panel'), [card.x + card.width / 2, card.y + 20]);
+  check('Settings opens the sound settings on top of the pause menu', (await visible('#sound-panel')) && onTop && (await state(page)).paused);
+  await page.screenshot({ path: path.join(OUT, 'pause-4-settings.png') });
+  await page.locator('#sound-done').click();
+  check('Done returns to the pause menu, still paused', !(await visible('#sound-panel')) && (await visible('#pause-menu')) && (await state(page)).paused);
+
+  // 6. Main Menu asks first.
+  await page.locator('#pause-main-menu').click();
+  check('Main Menu asks for confirmation', (await page.locator('#confirm-title').textContent()) === 'Leave the race?' && (await page.locator('#confirm-ok').textContent()) === 'Leave');
+  await page.locator('#confirm-cancel').click();
+  check('Cancel stays paused in the race', (await state(page)).paused && (await state(page)).mode === 'race');
+  await page.locator('#pause-main-menu').click();
+  await page.locator('#confirm-ok').click();
+  await sleep(300);
+  b = await state(page);
+  check('confirmed Main Menu leaves the race', !b.paused && b.mode === null && b.race === null && (await visible('#mode-race')) && !(await visible('#pause-menu')) && !(await visible('#pause-button')));
+
+  // 7. Free drive can be paused too.
+  await page.keyboard.press('KeyF');
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 2);
+  await page.locator('#pause-button').click();
+  await sleep(150);
+  a = await state(page);
+  await sleep(1000);
+  b = await state(page);
+  check('free drive: pause freezes the car', a.paused && frozenSnapshot(a) === frozenSnapshot(b) && a.speedKmh > 20, `${a.speedKmh.toFixed(0)} km/h`);
+  check('free drive: restart button says "Restart Drive"', (await page.locator('#pause-restart').textContent()) === 'Restart Drive');
+  await page.locator('#pause-resume').click();
+  await drive(page, 0.5);
+  await page.keyboard.up('ArrowUp');
+  check('free drive: Resume carries on', !(await state(page)).paused && (await state(page)).speedKmh > 20);
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
+}
+
+/** Pause menu by touch on iPhone sizes, upright and sideways, including turning the phone while paused. */
+async function iphonePauseTest(browser) {
+  console.log('\n— Pause menu on iPhone (touch) —');
+  const fits = (box, vp) => box && box.x >= 0 && box.y >= 0 && box.x + box.width <= vp.width + 0.5 && box.y + box.height <= vp.height + 0.5;
+  for (const name of ['iPhone SE', 'iPhone SE landscape', 'iPhone 13', 'iPhone 13 landscape', 'iPhone 14 Pro Max', 'iPhone 14 Pro Max landscape']) {
+    const { context, page, errors } = await openGame(browser, devices[name]);
+    const cdp = await context.newCDPSession(page);
+    const file = name.replace(/\s+/g, '-');
+    await page.locator('#mode-race').tap();
+    while ((await state(page)).race.time < 0.2) await sleep(40);
+    await holdTouch(page, cdp, '[data-action="gas"]', 1500);
+    await page.locator('#pause-button').tap();
+    await sleep(200);
+    let vp = page.viewportSize();
+    const a = await state(page);
+    await sleep(1000);
+    const b = await state(page);
+    const buttons = await page.locator('#pause-main .btn').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })));
+    const card = await page.locator('.pause-card').boundingBox();
+    const problems = [];
+    if (!fits(card, vp)) problems.push('menu goes off screen');
+    if (buttons.some((r) => r.height < 44)) problems.push('a button is shorter than 44 px');
+    // Nothing behind the menu can be touched: the middle of the GAS button now hits the menu backdrop.
+    const gas = await page.locator('[data-action="gas"]').boundingBox();
+    const blocked = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('#pause-menu'), [gas.x + gas.width / 2, gas.y + gas.height / 2]);
+    if (!blocked) problems.push('driving buttons can still be pressed');
+    await page.screenshot({ path: path.join(OUT, `pause-${file}.png`) });
+    check(`${name} (${vp.width}×${vp.height}): pause menu fits, buttons easy to tap, controls blocked`, problems.length === 0, problems.join('; '));
+    check(`${name}: race frozen while paused (by touch)`, a.paused && frozenSnapshot(a) === frozenSnapshot(b) && a.speedKmh > 10, `${a.speedKmh.toFixed(0)} km/h`);
+
+    await page.locator('#pause-main-menu').tap();
+    const confirm = await page.locator('.pause-card').boundingBox();
+    check(`${name}: "Leave the race?" question fits`, fits(confirm, vp) && (await page.locator('#confirm-ok').isVisible()));
+    await page.screenshot({ path: path.join(OUT, `pause-${file}-confirm.png`) });
+    await page.locator('#confirm-cancel').tap();
+
+    // Turn the phone while paused: still frozen, menu still fits.
+    await page.setViewportSize({ width: vp.height, height: vp.width });
+    await sleep(400);
+    vp = page.viewportSize();
+    const c = await state(page);
+    check(`${name}: turning the phone while paused keeps it frozen and the menu fits`, c.paused && frozenSnapshot(c) === frozenSnapshot(a) && fits(await page.locator('.pause-card').boundingBox(), vp));
+    await page.screenshot({ path: path.join(OUT, `pause-${file}-turned.png`) });
+
+    await page.locator('#pause-resume').tap();
+    await drive(page, 0.5);
+    const d = await state(page);
+    check(`${name}: Resume by touch carries on`, !d.paused && d.race.time > a.race.time && !(await page.locator('#pause-menu').isVisible()));
+    check(`${name}: no errors in the browser console`, errors.length === 0, errors.join(' | '));
+    await context.close();
+  }
+}
+
+/** Each car's paint colour, as set in the game (the player is red). */
+const PAINT = { You: '#e3262f', Nova: '#6b2fd6', Ember: '#ff6a00', Frost: '#e9eef3', Volt: '#ffc400', Jade: '#0f8a5f' };
+
+/** Colour actually drawn on the mini-map at (x, y) CSS pixels inside it. */
+function mapPixel(page, x, y) {
+  return page.evaluate(([x, y]) => {
+    const c = document.getElementById('minimap');
+    const k = c.width / c.getBoundingClientRect().width;
+    const d = c.getContext('2d').getImageData(Math.round(x * k), Math.round(y * k), 1, 1).data;
+    return [d[0], d[1], d[2], d[3]];
+  }, [x, y]);
+}
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const near = (px, hex, tol = 40) => px[3] > 200 && hexRgb(hex).every((v, i) => Math.abs(v - px[i]) <= tol);
+
+/** Checks the mini-map against the game: one arrow per car, right colour, right place, right direction. */
+async function checkMiniMap(page, label) {
+  const s = await state(page);
+  const m = s.miniMap;
+  const box = await page.locator('#minimap').boundingBox();
+  const cars = s.race ? s.race.cars : [{ name: 'You', shownX: s.position.x, shownZ: s.position.z, heading: s.heading }];
+  const problems = [];
+  if (m.markers.length !== cars.length) problems.push(`${m.markers.length} arrows for ${cars.length} cars`);
+  for (const car of cars) {
+    const mk = m.markers.find((x) => x.name === car.name);
+    if (!mk) {
+      problems.push(`no arrow for ${car.name}`);
+      continue;
+    }
+    // Independent check of where the arrow should be: the car's position, scaled into the map.
+    const ex = (car.shownX - m.minX) * m.scale + m.offsetX;
+    const ey = (car.shownZ - m.minZ) * m.scale + m.offsetY;
+    if (Math.hypot(mk.x - ex, mk.y - ey) > 0.5) problems.push(`${car.name} arrow ${Math.hypot(mk.x - ex, mk.y - ey).toFixed(1)} px out`);
+    if (mk.x < 0 || mk.y < 0 || mk.x > box.width || mk.y > box.height) problems.push(`${car.name} arrow outside the map`);
+    // Direction: the arrow must point the same way as the car.
+    const expected = Math.atan2(Math.cos(car.heading), Math.sin(car.heading));
+    if (Math.abs(Math.atan2(Math.sin(mk.angle - expected), Math.cos(mk.angle - expected))) > 0.02) problems.push(`${car.name} arrow points the wrong way`);
+    if (mk.colour !== PAINT[car.name]) problems.push(`${car.name} arrow is ${mk.colour}, car is ${PAINT[car.name]}`);
+    if (mk.isPlayer !== (car.name === 'You')) problems.push(`${car.name} highlighted wrongly`);
+  }
+  // What is really drawn: your arrow (on top) shows your red at its centre; an opponent's colour shows where
+  // no other arrow is drawn over it.
+  for (const mk of m.markers) {
+    const covered = m.markers.some((o) => o !== mk && (o.isPlayer || m.markers.indexOf(o) > m.markers.indexOf(mk)) && Math.hypot(o.x - mk.x, o.y - mk.y) < (o.isPlayer ? 15 : 10));
+    if (covered && !mk.isPlayer) continue;
+    const px = await mapPixel(page, mk.x + Math.cos(mk.angle) * 1.5, mk.y + Math.sin(mk.angle) * 1.5);
+    if (!near(px, mk.colour)) problems.push(`${mk.name} arrow not drawn in its colour (found rgb ${px.slice(0, 3).join(',')})`);
+  }
+  check(`${label}: mini-map shows every car in the right place, colour and direction`, problems.length === 0, problems.join('; ') || `${m.markers.length} arrows`);
+  return m;
+}
+
+async function miniMapTest(browser) {
+  console.log('\n— Mini-map (desktop) —');
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
+  check('mini-map hidden on the main menu', !(await page.locator('#minimap').isVisible()));
+  await page.keyboard.press('Enter');
+  await drive(page, 0.5);
+  check('mini-map shown in the race', await page.locator('#minimap').isVisible());
+  let m = await checkMiniMap(page, 'on the grid');
+  check('6 arrows, each a different colour', new Set(m.markers.map((x) => x.colour)).size === 6, m.markers.map((x) => `${x.name} ${x.colour}`).join(', '));
+  // The whole circuit is drawn inside the map: count track pixels along each edge band and in the middle.
+  const coverage = await page.evaluate(() => {
+    const c = document.getElementById('minimap');
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 150 && d[i] > 150 && d[i + 1] > 150 && d[i + 2] > 150) lit++;
+    return lit / (c.width * c.height);
+  });
+  check('circuit is drawn on the map', coverage > 0.05 && coverage < 0.5, `${(coverage * 100).toFixed(0)}% of the map is track`);
+  const g = m;
+  check('whole circuit fits inside the map', g.offsetX >= 10 && g.offsetY >= 10 && g.width - g.offsetX >= 10, `${g.width.toFixed(0)}×${g.height.toFixed(0)} px`);
+
+  // Racing: the arrows follow the cars in real time.
+  await page.keyboard.down('ArrowUp');
+  while ((await state(page)).race.time < 0.05) await sleep(40);
+  await drive(page, 3);
+  const a = await checkMiniMap(page, 'racing');
+  await drive(page, 3);
+  const b = await checkMiniMap(page, 'racing 3 s later');
+  const moved = a.markers.map((x) => Math.hypot(x.x - b.markers.find((y) => y.name === x.name).x, x.y - b.markers.find((y) => y.name === x.name).y));
+  check('all 6 arrows move around the track as the cars drive', moved.every((d) => d > 3), moved.map((d) => d.toFixed(0) + ' px').join(', '));
+  await page.screenshot({ path: path.join(OUT, 'minimap-1-race-desktop.png') });
+
+  // Paused: the map stands still with everything else.
+  await page.keyboard.press('Escape');
+  await sleep(200);
+  const p1 = (await state(page)).miniMap.markers;
+  await sleep(1000);
+  const p2 = (await state(page)).miniMap.markers;
+  check('paused: mini-map arrows stand still', JSON.stringify(p1) === JSON.stringify(p2));
+  check('pause menu covers the mini-map', await page.evaluate(() => {
+    const r = document.getElementById('minimap').getBoundingClientRect();
+    return !!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('#pause-menu');
+  }));
+  await page.keyboard.press('Escape');
+  await drive(page, 0.5);
+  await checkMiniMap(page, 'after Resume');
+  await page.keyboard.up('ArrowUp');
+
+  // Free drive: just your car.
+  await leaveToMenu(page, false);
+  check('mini-map hidden again on the main menu', !(await page.locator('#minimap').isVisible()));
+  await page.keyboard.press('KeyF');
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 2);
+  m = await checkMiniMap(page, 'free drive');
+  check('free drive: only your arrow', m.markers.length === 1 && m.markers[0].isPlayer);
+  await page.keyboard.up('ArrowUp');
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
+}
+
+/** Mini-map on iPhone screens, upright and sideways, and turning the phone mid-race. */
+async function iphoneMiniMapTest(browser) {
+  console.log('\n— Mini-map on iPhone (touch) —');
+  for (const name of ['iPhone SE landscape', 'iPhone 13', 'iPhone 13 landscape']) {
+    const { context, page, errors } = await openGame(browser, devices[name]);
+    const cdp = await context.newCDPSession(page);
+    const file = name.replace(/\s+/g, '-');
+    await page.locator('#mode-race').tap();
+    while ((await state(page)).race.time < 0.2) await sleep(40);
+    await holdTouch(page, cdp, '[data-action="gas"]', 2500);
+    const box = await page.locator('#minimap').boundingBox();
+    check(`${name}: mini-map is small (${Math.round(box.width)}×${Math.round(box.height)} px)`, box.width <= 130 && box.height <= 150 && box.width >= 80);
+    await checkMiniMap(page, name);
+    // Taps on the map area go through to the game (the map never blocks a touch).
+    check(`${name}: mini-map never blocks a tap`, await page.evaluate(() => getComputedStyle(document.getElementById('minimap')).pointerEvents === 'none'));
+    await page.screenshot({ path: path.join(OUT, `minimap-${file}.png`) });
+
+    // Turn the phone mid-race: the map moves to its other spot and redraws to fit.
+    const vp = page.viewportSize();
+    await page.setViewportSize({ width: vp.height, height: vp.width });
+    await sleep(500);
+    const turned = await page.locator('#minimap').boundingBox();
+    const vp2 = page.viewportSize();
+    check(`${name} → turned: mini-map fits on screen`, turned.x >= 0 && turned.y >= 0 && turned.x + turned.width <= vp2.width && turned.y + turned.height <= vp2.height, `${Math.round(turned.width)}×${Math.round(turned.height)} px`);
+    const m = await checkMiniMap(page, `${name} → turned`);
+    check(`${name} → turned: map redrawn at its new size`, Math.abs(m.width - turned.width) < 1 && Math.abs(m.height - turned.height) < 1);
+    await page.screenshot({ path: path.join(OUT, `minimap-${file}-turned.png`) });
+    check(`${name}: no errors in the browser console`, errors.length === 0, errors.join(' | '));
     await context.close();
   }
 }
@@ -708,7 +1039,7 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    const sections = { desktopTest, circuitTest, raceTest, audioTest, sliderTest, persistenceTest, iphoneTest, iphoneRaceTest, hudLayoutTest };
+    const sections = { desktopTest, circuitTest, raceTest, pauseTest, miniMapTest, audioTest, sliderTest, persistenceTest, iphoneTest, iphoneRaceTest, iphonePauseTest, iphoneMiniMapTest, hudLayoutTest };
     // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
     for (const [name, run] of Object.entries(sections)) {
       if (!process.env.ONLY || process.env.ONLY === name) await run(browser);

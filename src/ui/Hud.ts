@@ -9,7 +9,7 @@ export class Hud {
   private readonly startPrompt = getElement('start-prompt');
   private readonly modeButtons = getElement('mode-buttons');
   private readonly hud = getElement('hud');
-  private readonly menuButton = getElement('menu-button');
+  private readonly pauseButton = getElement('pause-button');
   private readonly speedValue = getElement('speed-value');
   private readonly speedBar = getElement('speed-bar');
   private lastSpeed = -1;
@@ -28,7 +28,7 @@ export class Hud {
     this.modeButtons.hidden = false;
     getElement('sound-settings-button').hidden = false;
     this.hud.hidden = true;
-    this.menuButton.hidden = true;
+    this.pauseButton.hidden = true;
     document.body.classList.remove('playing');
 
     const choose = (mode: GameMode) => {
@@ -38,7 +38,7 @@ export class Hud {
       getElement('mode-free').onclick = null;
       this.startScreen.classList.add('hidden');
       this.hud.hidden = false;
-      this.menuButton.hidden = false;
+      this.pauseButton.hidden = false;
       document.body.classList.add('playing');
       onSelect(mode);
     };
@@ -50,14 +50,6 @@ export class Hud {
       else if (e.code === 'KeyF') choose('free');
     };
     window.addEventListener('keydown', this.keyHandler);
-  }
-
-  /** Called when the menu button (or Esc) is pressed while driving. */
-  onMenuButton(listener: () => void) {
-    this.menuButton.addEventListener('click', listener);
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape' && !this.menuButton.hidden) listener();
-    });
   }
 
   showError(message: string) {

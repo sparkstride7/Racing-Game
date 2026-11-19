@@ -531,8 +531,8 @@ body:not(.playing) #touch-controls {
   }
 }
 
-/* ---------- Menu button (top right) ---------- */
-#menu-button {
+/* ---------- Pause button (top right, shown while driving) ---------- */
+#pause-button {
   position: absolute;
   top: calc(14px + var(--safe-top));
   right: calc(16px + var(--safe-right));
@@ -544,17 +544,111 @@ body:not(.playing) #touch-controls {
   background: var(--glass);
   border: 1px solid var(--glass-border);
   cursor: pointer;
+  touch-action: manipulation;
 }
-body.touch #menu-button {
+body.touch #pause-button {
   right: calc(70px + var(--safe-right));
 }
-#menu-button svg {
+#pause-button svg {
   width: 100%;
   height: 100%;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.4;
+  stroke-width: 3;
   stroke-linecap: round;
+}
+
+/* ---------- Mini-map (top right, under the buttons; shown while driving) ---------- */
+#minimap {
+  position: absolute;
+  top: calc(14px + 44px + 10px + var(--safe-top));
+  right: calc(16px + var(--safe-right));
+  height: 150px;
+  aspect-ratio: 5 / 6; /* the circuit is a little taller than it is wide */
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: var(--glass-strong); /* darker than the buttons, so the light track stands out */
+  border: 1px solid var(--glass-border);
+  pointer-events: none; /* never blocks a tap */
+}
+body:not(.playing) #minimap {
+  display: none;
+}
+/* Phone held sideways: fits between the row of buttons and the GAS/BRAKE pedals. */
+body.touch #minimap {
+  height: min(150px, calc(100vh - 206px - var(--safe-top) - var(--safe-bottom)));
+  height: min(150px, calc(100dvh - 206px - var(--safe-top) - var(--safe-bottom)));
+}
+/* Phone held upright: in the right-hand column, under the speedometer. */
+@media (orientation: portrait) {
+  body.touch #minimap {
+    top: calc(14px + 44px + 10px + 44px + 10px + 60px + 10px + var(--safe-top));
+    height: 124px;
+  }
+}
+
+/* ---------- Pause menu (the game is frozen behind it) ---------- */
+#pause-menu {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: calc(12px + var(--safe-top)) calc(16px + var(--safe-right)) calc(12px + var(--safe-bottom))
+    calc(16px + var(--safe-left));
+  background: rgba(5, 8, 14, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade-in 0.2s ease;
+  overflow-y: auto;
+}
+.pause-card {
+  box-sizing: border-box; /* padding inside the width, so it never gets wider than the screen */
+  width: min(320px, 100%);
+  padding: 18px 20px 20px;
+  border-radius: 22px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  text-align: center;
+}
+.pause-card h2 {
+  margin: 0 0 14px;
+  font-size: 26px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+.pause-buttons {
+  display: grid;
+  gap: 10px;
+}
+.pause-buttons .btn {
+  min-height: 48px; /* comfortable to tap */
+  font-size: 17px;
+}
+.pause-buttons.two {
+  grid-template-columns: 1fr 1fr;
+}
+.confirm-text {
+  margin: -6px 0 16px;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+/* Short screens (phone held sideways): two columns of buttons so the whole menu fits. */
+@media (max-height: 420px) {
+  .pause-card {
+    width: min(440px, 100%);
+    padding: 12px 18px 16px;
+  }
+  .pause-card h2 {
+    margin: 0 0 10px;
+    font-size: 22px;
+  }
+  .pause-buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+  .confirm-text {
+    margin: -4px 0 12px;
+  }
 }
 
 /* ---------- Results ---------- */
@@ -702,7 +796,7 @@ body.touch #menu-button {
 }
 
 /* ---------- Sound button (top right, shown while driving) ----------
-   Row order from the right: [reset] (touch only), [menu], [sound]. */
+   Row order from the right: [reset] (touch only), [pause], [sound]. */
 #sound-button {
   position: absolute;
   top: calc(14px + var(--safe-top));

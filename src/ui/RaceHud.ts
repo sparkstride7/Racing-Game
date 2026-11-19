@@ -91,7 +91,7 @@ export class RaceHud {
     getElement('race-again').addEventListener('click', raceAgain);
     getElement('results-menu').addEventListener('click', menu);
     window.addEventListener('keydown', (e) => {
-      if (!this.resultsShown) return;
+      if (!this.resultsShown || !getElement('pause-menu').hidden) return; // the pause menu has its own keys
       if (e.code === 'Enter' || e.code === 'NumpadEnter') raceAgain();
     });
   }
