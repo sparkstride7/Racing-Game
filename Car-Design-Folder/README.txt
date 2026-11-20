@@ -1,8 +1,8 @@
 CAR DESIGN FOLDER
 Racing Game project - preserved car designs
-Created 20 November 2026
+Created 20 November 2026 (EXOTIC_v10b added later the same day)
 
-This folder keeps five car designs from the Racing Game's development history,
+This folder keeps six car designs from the Racing Game's development history,
 each in its own folder, so they can be opened, studied or reused later.
 
 All files are unchanged copies. The originals were left exactly where they were.
@@ -23,7 +23,8 @@ About the preview images
   Every image in the Preview-Images folders is an original image made during
   development. No new renders were added.
   Original preview images found: V1 9, V2-GT-Racecar 4, V4-Exotic 57,
-  V4-GT-Racecar 57 (24 of these are the shared On-Circuit pictures), V10c 20.
+  V4-GT-Racecar 57 (24 of these are the shared On-Circuit pictures),
+  EXOTIC_v10b 21, V10c 20.
 
 
 ----------------------------------------------------------------------
@@ -112,6 +113,32 @@ Preview-Images/  original images (17 November, 20:30 to 21:28)
 
 
 ----------------------------------------------------------------------
+EXOTIC_v10b/   Exotic v10b
+----------------------------------------------------------------------
+Version:   exotic-v10b (18 November 2026), v10 with a reshaped front wing.
+           It came before V10c.
+Source:    Built by the build scripts in Source-Code (final model saved on
+           18 November at 19:51:27)
+GitHub:    Added to this folder on 20 November 2026.
+Details:   EXOTIC_v10b has its own README.txt and CHECKSUMS-SHA256.txt.
+
+Model/original_exotic_supercar_v10_source.glb
+           The full-detail 3D model. Its name says "v10" because every v10
+           version used the same file name; this is the v10b file. It is a
+           different file from the one in V10c.
+Optimised-LOD-Files/optimized_exotic_supercar_v10bopt_LOD0/1/2.glb
+           the same car in three levels of detail
+Source-Code/   build4.ts, designs4.ts, parts.ts, geo.ts, main.ts, index.html,
+               vite.config.mjs, shoot0.cjs, build.log
+
+Preview-Images/  21 original images
+  Studio view, 11 views and close-ups on Greenfield Circuit, front / front
+  three-quarter / side views (plus the same with each part coloured), the
+  v10 vs v10b and v10b vs v10c comparisons, and one second render in
+  Second-Render-For-v10c-Comparison. No colour variations were made.
+
+
+----------------------------------------------------------------------
 V10c/   Exotic v10c
 ----------------------------------------------------------------------
 Version:   exotic-v10c (18 November 2026), the front-end refinement of v10,
@@ -146,5 +173,6 @@ Preview-Images/  original images (18 November, 20:03 to 21:43)
 
 
 ----------------------------------------------------------------------
-CHECKSUMS-SHA256.txt lists a fingerprint for every file in this folder, so
-you can check later that nothing has changed.
+CHECKSUMS-SHA256.txt lists a fingerprint for every file in this folder except
+this README and the list itself, so you can check later that nothing has
+changed.
