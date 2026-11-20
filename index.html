@@ -117,9 +117,25 @@
             <span class="btn-title">FREE DRIVE</span><span class="btn-sub">Practise alone</span>
           </button>
         </div>
+        <!-- Car selection (after RACE): the car behind the menu changes as you choose -->
+        <div id="car-select" class="car-select" hidden>
+          <p class="car-select-title">Choose your car</p>
+          <div class="car-options" role="radiogroup" aria-label="Choose your car">
+            <button class="btn big car-option" data-car="v1" role="radio" aria-checked="true">
+              <span class="btn-title">ORIGINAL CAR (V1)</span><span class="btn-sub">From the first build</span>
+            </button>
+            <button class="btn big car-option" data-car="sports" role="radio" aria-checked="false">
+              <span class="btn-title">NEW SPORTS CAR</span><span class="btn-sub">Our latest design</span>
+            </button>
+          </div>
+          <div class="car-actions">
+            <button id="car-back" class="btn">Back</button>
+            <button id="car-start" class="btn primary">START RACE</button>
+          </div>
+        </div>
         <button id="sound-settings-button" class="btn small" hidden>🔊 Sound settings</button>
         <p id="help-keyboard" class="help">
-          <b>Enter</b> race &nbsp; <b>F</b> free drive &nbsp; <b>Esc / P</b> pause &nbsp; <b>M</b> sound on/off<br />
+          <b>Enter</b> race (choose car) &nbsp; <b>F</b> free drive &nbsp; <b>Esc / P</b> pause &nbsp; <b>M</b> sound on/off<br />
           <b>W / ↑</b> accelerate &nbsp; <b>S / ↓</b> brake &amp; reverse &nbsp; <b>A D / ← →</b> steer<br />
           <b>Space</b> handbrake &nbsp; <b>R</b> reset car
         </p>

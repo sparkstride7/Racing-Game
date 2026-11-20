@@ -389,6 +389,93 @@ body:not(.playing) #touch-controls {
 #start-screen.ready .prompt {
   display: none;
 }
+
+/* ---------- Car selection (after RACE; replaces the RACE / FREE DRIVE buttons) ---------- */
+.car-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.car-select-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+.car-options {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+.car-option {
+  min-width: 190px;
+  opacity: 0.82;
+}
+/* The chosen car: a white outline with a red ring and a tick. */
+.car-option[aria-checked='true'] {
+  opacity: 1;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 3px var(--accent), 0 8px 26px var(--accent-glow);
+}
+.car-option[aria-checked='true'] .btn-title::before {
+  content: '✓ ';
+}
+.car-actions {
+  display: flex;
+  gap: 12px;
+}
+.car-actions .btn {
+  min-height: 46px;
+  min-width: 110px;
+  font-size: 16px;
+}
+#car-start {
+  min-width: 170px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+/* While choosing, the help text makes way so the car stays visible. */
+#start-screen.choosing .help {
+  display: none;
+}
+/* Phone held upright: the two cars one above the other. */
+@media (orientation: portrait) {
+  .car-options {
+    flex-direction: column;
+    width: min(300px, 100%);
+  }
+  .car-option {
+    min-width: 0;
+  }
+}
+/* Short screens (phone held sideways): compact, so the car in the middle stays in view. */
+@media (max-height: 420px) {
+  #start-screen.choosing .subtitle,
+  .car-select-title,
+  .car-option .btn-sub {
+    display: none;
+  }
+  .car-select {
+    gap: 8px;
+  }
+  .car-option {
+    min-width: 180px;
+    min-height: 46px;
+    padding: 8px 18px;
+    justify-content: center;
+  }
+  .car-option .btn-title {
+    font-size: 16px;
+  }
+  .car-actions .btn {
+    min-height: 44px;
+  }
+}
+
 #start-screen {
   cursor: default;
 }

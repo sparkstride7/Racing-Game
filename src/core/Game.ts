@@ -12,6 +12,7 @@ import { RaceHud } from '../ui/RaceHud';
 import { SoundControls } from '../ui/SoundControls';
 import { Car } from '../vehicle/Car';
 import { PLAYER_STYLE } from '../vehicle/CarModel';
+import { loadCarChoice, saveCarChoice, type CarLook } from '../vehicle/playerCar';
 import { Environment } from '../world/Environment';
 import { Circuit } from '../world/Circuit';
 import { Physics } from './Physics';
@@ -44,6 +45,8 @@ export class Game {
   /** Set when the screen size changes while paused, so the frozen picture is drawn again at the new size. */
   private redrawWhilePaused = false;
   private pauseMenu!: PauseMenu;
+  /** The player's car: chosen on the car-selection screen and remembered on this device (V1 the first time). */
+  private carLook: CarLook = loadCarChoice();
   private miniMap!: MiniMap;
   private race: Race | null = null;
   private raceHud!: RaceHud;
@@ -84,7 +87,7 @@ export class Game {
     // Let the player know the simpler built-in cars are in use (downloads failed, timed out, or ?cars=builtin).
     document.getElementById('cars-note')?.toggleAttribute('hidden', this.carModelsLoaded);
 
-    this.car = new Car(this.physics.world);
+    this.car = new Car(this.physics.world, PLAYER_STYLE, this.carLook);
     this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading);
     this.scene.add(this.car.object);
 
@@ -132,8 +135,17 @@ export class Game {
     this.started = false;
     this.mode = null;
     this.car.setSpawn(this.track.spawnPosition, this.track.spawnHeading);
+    this.car.setLook(this.carLook);
     this.chaseCamera.showcase();
-    this.hud.showMenu((mode) => this.startMode(mode));
+    this.hud.showMenu((mode) => this.startMode(mode), {
+      current: () => this.carLook,
+      preview: (look) => this.car.setLook(look),
+      confirm: (look) => {
+        this.carLook = look;
+        saveCarChoice(look);
+        this.car.setLook(look);
+      },
+    });
   }
 
   /** Starts free drive (alone, as before) or a race against the five opponents. */
@@ -253,6 +265,7 @@ export class Game {
           started: this.started,
           mode: this.mode,
           paused: this.paused,
+          carLook: this.carLook,
           race: race
             ? {
                 phase: race.phase,

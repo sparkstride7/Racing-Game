@@ -307,7 +307,7 @@ function createWheelGeometries(): Record<WheelPart, THREE.BufferGeometry> {
 // ------------------------------------------------------------------ Race numbers
 
 /** White roundels with the car's number on the roof and both doors (one mesh). */
-function createNumberDecals(number: number) {
+export function createNumberDecals(number: number) {
   const texture = createNumberTexture(number);
 
   const geometry = mergeAll([
@@ -315,7 +315,9 @@ function createNumberDecals(number: number) {
     new THREE.PlaneGeometry(0.5, 0.5).rotateY(Math.PI / 2).translate(BODY_WIDTH / 2 + 0.012, 0.6, -0.05),
     new THREE.PlaneGeometry(0.5, 0.5).rotateY(-Math.PI / 2).translate(-BODY_WIDTH / 2 - 0.012, 0.6, -0.05),
   ]);
-  return new THREE.Mesh(geometry, createNumberMaterial(texture));
+  const mesh = new THREE.Mesh(geometry, createNumberMaterial(texture));
+  mesh.name = 'Race_Numbers';
+  return mesh;
 }
 
 /** Material for race-number roundels (drawn just in front of the paint). */

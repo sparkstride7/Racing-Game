@@ -7,6 +7,7 @@ import { clamp, lerp, moveTowards } from '../utils/math';
 import { createCarModel, type CarModel, type CarStyle, MODEL_GROUND_OFFSET, PLAYER_STYLE } from './CarModel';
 import { getCarTemplate } from './carAssets';
 import { GlbCarModel } from './GlbCarModel';
+import { createV1Car, disposeV1Car, type CarLook } from './playerCar';
 
 /** Wheel order used everywhere: front-left, front-right, rear-left, rear-right. */
 const WHEELS = [
@@ -31,10 +32,12 @@ export class Car {
   readonly object = new THREE.Group();
   readonly body: RigidBody;
   private readonly vehicle: DynamicRayCastVehicleController;
-  /** The built-in car (used when the 3D model files are not loaded), or null. */
-  private readonly model: CarModel | null = null;
+  /** A code-built car (the Original Car V1, or the built-in car used when the 3D model files are not loaded), or null. */
+  private model: CarModel | null = null;
   /** The 3D model car with its three detail levels, or null. */
-  private readonly glb: GlbCarModel | null = null;
+  private glb: GlbCarModel | null = null;
+  /** Which car this is drawn as (only the player's car can be switched; the opponents are always 'sports'). */
+  private currentLook: CarLook = 'sports';
 
   private steerAngle = 0;
   private upsideDownTime = 0;
@@ -56,7 +59,11 @@ export class Car {
    */
   onAutoReset: (() => void) | null = null;
 
-  constructor(world: World, style: CarStyle = PLAYER_STYLE) {
+  constructor(
+    world: World,
+    private readonly style: CarStyle = PLAYER_STYLE,
+    look: CarLook = 'sports',
+  ) {
     // Physics body. Mass and balance are set by hand so we control the centre of mass.
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
       .setAdditionalMassProperties(
@@ -100,24 +107,69 @@ export class Car {
       this.vehicle.setWheelFrictionSlip(i, w.front ? CAR.frontGrip : CAR.rearGrip);
     });
 
-    // 3D model. It sits lower than the physics origin (which is at axle height + suspension).
-    // Use the loaded model file for this car's body if there is one, otherwise the built-in car.
-    const template = getCarTemplate(style.body ?? 'exotic');
+    this.showLook(look);
+  }
+
+  /**
+   * Switches what the car looks like (the player's car on the car-selection screen).
+   * Only the 3D model is swapped: the physics body, its position and its speed are not touched.
+   */
+  setLook(look: CarLook) {
+    if (look === this.currentLook) return;
+    this.removeLook();
+    this.showLook(look);
+  }
+
+  get look() {
+    return this.currentLook;
+  }
+
+  /** Builds the 3D model. It sits lower than the physics origin (which is at axle height + suspension). */
+  private showLook(look: CarLook) {
+    this.currentLook = look;
+    if (look === 'v1') {
+      this.showCodeBuiltCar(createV1Car());
+      return;
+    }
+    // The New Sports Car: the loaded model file if there is one, otherwise the built-in car.
+    const template = getCarTemplate(this.style.body ?? 'exotic');
     if (template) {
-      this.glb = new GlbCarModel(template, style);
+      this.glb = new GlbCarModel(template, this.style);
       this.glb.root.position.y = -MODEL_GROUND_OFFSET;
       this.object.add(this.glb.root);
     } else {
-      this.model = createCarModel(style);
-      this.model.body.position.y = -MODEL_GROUND_OFFSET;
-      this.object.add(this.model.body);
-      this.model.wheels.forEach((wheel) => this.object.add(wheel.pivot));
+      this.showCodeBuiltCar(createCarModel(this.style));
     }
   }
 
-  /** Which 3D model this car shows ('model' = loaded model file, 'built-in' = code-built car), and its detail level. */
+  private showCodeBuiltCar(model: CarModel) {
+    this.model = model;
+    model.body.position.y = -MODEL_GROUND_OFFSET;
+    this.object.add(model.body);
+    model.wheels.forEach((wheel) => this.object.add(wheel.pivot));
+  }
+
+  private removeLook() {
+    if (this.glb) {
+      this.object.remove(this.glb.root);
+      this.glb.dispose();
+      this.glb = null;
+    }
+    if (this.model) {
+      this.object.remove(this.model.body, ...this.model.wheels.map((w) => w.pivot));
+      if (this.currentLook === 'v1') disposeV1Car(this.model);
+      else disposeMaterials(this.model); // the built-in car's shapes are shared by all cars, so only its colours are freed
+      this.model = null;
+    }
+  }
+
+  /**
+   * What this car shows: 'v1' = the Original Car, 'model' = the sports car model file, 'built-in' = the simple
+   * code-built car (when the model files are not loaded); its detail level; and whether race numbers are shown.
+   */
   get visualInfo() {
-    return this.glb ? { kind: 'model' as const, level: this.glb.currentLevel } : { kind: 'built-in' as const, level: 0 };
+    const kind = this.glb ? ('model' as const) : this.currentLook === 'v1' ? ('v1' as const) : ('built-in' as const);
+    return { kind, level: this.glb ? this.glb.currentLevel : 0, numbers: !!this.object.getObjectByName('Race_Numbers') };
   }
 
   /** Places the car (used at the start and when resetting). */
@@ -239,7 +291,7 @@ export class Car {
   dispose(world: World) {
     world.removeVehicleController(this.vehicle);
     world.removeRigidBody(this.body);
-    this.glb?.dispose();
+    this.removeLook();
   }
 
   /** Called after each physics step. */
@@ -281,5 +333,18 @@ export class Car {
     const r = this.body.rotation();
     this.currPos.set(p.x, p.y, p.z);
     this.currQuat.set(r.x, r.y, r.z, r.w);
+  }
+}
+
+/** Frees a code-built car's materials (not its shapes, which are shared). */
+function disposeMaterials(model: CarModel) {
+  for (const root of [model.body, ...model.wheels.map((w) => w.pivot)]) {
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      material.map?.dispose();
+      material.dispose();
+    });
   }
 }

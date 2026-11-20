@@ -180,7 +180,7 @@ async function raceTest(browser) {
   console.log('\n— Race (desktop) —');
   // ?laps=2 keeps the test short; real races are 3 laps.
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
-  await page.keyboard.press('Enter');
+  await startRace(page, 'key');
   await drive(page, 0.3);
   const early = await page.locator('#countdown').textContent();
   check('no "FINAL LAP" banner before the countdown', early !== 'FINAL LAP', `shows "${early}"`);
@@ -243,7 +243,7 @@ async function iphoneRaceTest(browser) {
   console.log('\n— iPhone race (touch) —');
   const { context, page, errors } = await openGame(browser, devices['iPhone 13 landscape']);
   const cdp = await context.newCDPSession(page);
-  await page.locator('#mode-race').tap();
+  await startRace(page, 'tap');
   await drive(page, 1.2);
   await page.screenshot({ path: path.join(OUT, 'iphone-5-race-countdown.png') });
   check('race starts from the RACE button', (await state(page)).mode === 'race');
@@ -295,7 +295,8 @@ async function hudLayoutTest(browser) {
       if (mode === 'free') {
         await leaveToMenu(page, true);
       }
-      await page.locator(mode === 'race' ? '#mode-race' : '#mode-free').tap();
+      if (mode === 'race') await startRace(page, 'tap');
+      else await page.locator('#mode-free').tap();
       await sleep(600);
       const boxes = {};
       for (const [label, selector] of Object.entries(HUD_PARTS)) {
@@ -327,7 +328,7 @@ async function hudLayoutTest(browser) {
         check(`${name}: results screen fits the screen width`, ok, results ? `${Math.round(results.width)} px wide on a ${vp.width} px screen` : 'results not shown');
         await page.locator('#results-menu').tap();
         await sleep(300);
-        await page.locator('#mode-race').tap(); // back into the race so the next screenshot matches
+        await startRace(page, 'tap'); // back into the race so the next screenshot matches
         await sleep(300);
       }
       const file = `layout-${name.replace(/\s+/g, '-')}-${mode}.png`;
@@ -336,6 +337,25 @@ async function hudLayoutTest(browser) {
     }
     await context.close();
   }
+}
+
+/**
+ * Starts a race from the main menu: RACE, then START RACE on the car-selection screen.
+ * `how` is 'key' (Enter, Enter), 'click' (mouse) or 'tap' (touch); `car` picks a car first ('v1' or 'sports').
+ */
+async function startRace(page, how, car) {
+  if (how === 'key') {
+    await page.keyboard.press('Enter');
+    if (car && (await state(page)).carLook !== car && (await page.locator('.car-option[aria-checked="true"]').getAttribute('data-car')) !== car) {
+      await page.keyboard.press('ArrowRight');
+    }
+    await page.keyboard.press('Enter');
+    return;
+  }
+  const press = (selector) => (how === 'tap' ? page.locator(selector).tap() : page.locator(selector).click());
+  await press('#mode-race');
+  if (car) await press(`.car-option[data-car="${car}"]`);
+  await press('#car-start');
 }
 
 /** Pause → Main Menu → "Leave": back to the main menu (by touch with `tap`, otherwise by mouse). */
@@ -362,7 +382,7 @@ async function pauseTest(browser) {
   console.log('\n— Pause menu (desktop) —');
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
   const visible = (selector) => page.locator(selector).isVisible();
-  await page.keyboard.press('Enter');
+  await startRace(page, 'key');
   await drive(page, 1.2);
   check('pause button is shown while racing', await visible('#pause-button'));
 
@@ -480,7 +500,7 @@ async function iphonePauseTest(browser) {
     const { context, page, errors } = await openGame(browser, devices[name]);
     const cdp = await context.newCDPSession(page);
     const file = name.replace(/\s+/g, '-');
-    await page.locator('#mode-race').tap();
+    await startRace(page, 'tap');
     while ((await state(page)).race.time < 0.2) await sleep(40);
     await holdTouch(page, cdp, '[data-action="gas"]', 1500);
     await page.locator('#pause-button').tap();
@@ -581,7 +601,7 @@ async function miniMapTest(browser) {
   console.log('\n— Mini-map (desktop) —');
   const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
   check('mini-map hidden on the main menu', !(await page.locator('#minimap').isVisible()));
-  await page.keyboard.press('Enter');
+  await startRace(page, 'key');
   await drive(page, 0.5);
   check('mini-map shown in the race', await page.locator('#minimap').isVisible());
   let m = await checkMiniMap(page, 'on the grid');
@@ -645,7 +665,7 @@ async function iphoneMiniMapTest(browser) {
     const { context, page, errors } = await openGame(browser, devices[name]);
     const cdp = await context.newCDPSession(page);
     const file = name.replace(/\s+/g, '-');
-    await page.locator('#mode-race').tap();
+    await startRace(page, 'tap');
     while ((await state(page)).race.time < 0.2) await sleep(40);
     await holdTouch(page, cdp, '[data-action="gas"]', 2500);
     const box = await page.locator('#minimap').boundingBox();
@@ -665,6 +685,202 @@ async function iphoneMiniMapTest(browser) {
     const m = await checkMiniMap(page, `${name} → turned`);
     check(`${name} → turned: map redrawn at its new size`, Math.abs(m.width - turned.width) < 1 && Math.abs(m.height - turned.height) < 1);
     await page.screenshot({ path: path.join(OUT, `minimap-${file}-turned.png`) });
+    check(`${name}: no errors in the browser console`, errors.length === 0, errors.join(' | '));
+    await context.close();
+  }
+}
+
+/** Race numbers shown on the leaderboard, by driver (e.g. { You: '#7', Nova: '#1', ... }). */
+async function leaderboardNumbers(page) {
+  const rows = await page.$$eval('#standings li', (lis) => lis.map((li) => [li.children[2].textContent, li.children[3].textContent]));
+  return Object.fromEntries(rows);
+}
+const NUMBERS = { You: '#7', Nova: '#1', Ember: '#22', Frost: '#3', Volt: '#11', Jade: '#45' };
+
+/** In a race: the player's car is `look`, and the five opponents are their unchanged sports cars. */
+async function checkRaceCars(page, look, label) {
+  const s = await state(page);
+  const cars = s.carModels.cars;
+  const me = cars.find((c) => c.name === 'You');
+  const rivals = cars.filter((c) => c.name !== 'You');
+  check(`${label}: your car is the ${look === 'v1' ? 'Original Car (V1)' : 'New Sports Car'} with its race number`, me.kind === (look === 'v1' ? 'v1' : 'model') && me.numbers, JSON.stringify(me));
+  check(`${label}: all 5 opponents are unchanged sports cars with numbers`, rivals.length === 5 && rivals.every((c) => c.kind === 'model' && c.numbers), rivals.map((c) => `${c.name}:${c.kind}`).join(' '));
+  const numbers = await leaderboardNumbers(page);
+  check(`${label}: leaderboard numbers unchanged`, Object.entries(NUMBERS).every(([name, n]) => numbers[name] === n), JSON.stringify(numbers));
+  await checkMiniMap(page, label); // also checks every car's colour
+  return s;
+}
+
+/** The car shown and chosen, as the selection screen and the game see it. */
+async function carScreen(page) {
+  return page.evaluate(() => ({
+    open: !document.getElementById('car-select').hidden,
+    checked: document.querySelector('.car-option[aria-checked="true"]')?.getAttribute('data-car') ?? null,
+    shown: window.__game.state().carModels.player.kind,
+    saved: window.__game.state().carLook,
+  }));
+}
+
+async function carSelectTest(browser) {
+  console.log('\n— Car selection (desktop) —');
+  const { context, page, errors } = await openGame(browser, { viewport: { width: 1280, height: 720 } }, '?laps=2');
+  const visible = (selector) => page.locator(selector).isVisible();
+  let c = await carScreen(page);
+  check('first-time player: the Original Car (V1) is shown on the menu', c.shown === 'v1' && c.saved === 'v1', JSON.stringify(c));
+
+  await page.locator('#mode-race').click();
+  c = await carScreen(page);
+  check('RACE opens the car-selection screen', c.open && !(await visible('#mode-buttons')) && (await visible('#car-start')) && (await visible('#car-back')));
+  const labels = await page.locator('.car-option .btn-title').allTextContents();
+  check('choices are "Original Car (V1)" and "New Sports Car"', labels.join('|') === 'ORIGINAL CAR (V1)|NEW SPORTS CAR', labels.join(', '));
+  check('first-time player: V1 is selected', c.checked === 'v1');
+  await page.screenshot({ path: path.join(OUT, 'car-select-1-desktop.png') });
+
+  await page.locator('.car-option[data-car="sports"]').click();
+  c = await carScreen(page);
+  check('picking New Sports Car shows it behind the menu straight away', c.checked === 'sports' && c.shown === 'model' && c.saved === 'v1', JSON.stringify(c));
+  await page.locator('#car-back').click();
+  c = await carScreen(page);
+  check('Back returns to the main menu and keeps the car chosen before', !c.open && (await visible('#mode-buttons')) && c.shown === 'v1' && c.saved === 'v1', JSON.stringify(c));
+
+  // Race with V1.
+  await startRace(page, 'click', 'v1');
+  await drive(page, 0.5);
+  check('START RACE with V1 starts the race', (await state(page)).mode === 'race' && (await page.locator('#start-screen').getAttribute('class')).includes('hidden') && !(await carScreen(page)).open);
+  await checkRaceCars(page, 'v1', 'race with V1');
+  await page.keyboard.down('ArrowUp');
+  while ((await state(page)).race.time < 0.05) await sleep(40);
+  await drive(page, 3);
+  let s = await state(page);
+  check('V1 drives in the race', s.race.cars.find((x) => x.name === 'You').speedKmh > 60, `${s.race.cars.find((x) => x.name === 'You').speedKmh.toFixed(0)} km/h`);
+  console.log(`      per frame with V1 + 5 sports cars: ${s.drawCalls} draw calls, ${Math.round(s.triangles / 1000)}k triangles`);
+  check('race with V1 stays within the iPhone performance budget', s.drawCalls < 400 && s.triangles < 600000);
+  await page.screenshot({ path: path.join(OUT, 'car-select-2-race-v1.png') });
+  // Pause still works, and Restart keeps the car.
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  const a = await state(page);
+  await sleep(800);
+  check('pause menu freezes the race with V1', a.paused && frozenSnapshot(a) === frozenSnapshot(await state(page)));
+  await page.locator('#pause-restart').click();
+  await page.locator('#confirm-ok').click();
+  await page.keyboard.up('ArrowUp');
+  await drive(page, 0.3);
+  check('Restart Race keeps V1 (no need to choose again)', (await state(page)).carModels.player.kind === 'v1' && (await state(page)).race.phase === 'countdown');
+  // Race Again keeps the car too.
+  await page.evaluate(() => window.__game.placeBeforeFinish(5));
+  await page.locator('#results').waitFor({ state: 'visible', timeout: 60000 });
+  await page.locator('#race-again').click();
+  await drive(page, 0.3);
+  check('Race Again keeps V1', (await state(page)).carModels.player.kind === 'v1' && (await state(page)).race.phase === 'countdown');
+
+  // Free Drive uses the last-selected car.
+  await leaveToMenu(page, false);
+  await page.keyboard.press('KeyF');
+  await drive(page, 0.5);
+  check('Free Drive uses the last-selected car (V1)', (await state(page)).mode === 'free' && (await state(page)).carModels.player.kind === 'v1');
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 3);
+  const v1Speed = (await state(page)).speedKmh;
+  await page.keyboard.up('ArrowUp');
+
+  // Choose the sports car with the keyboard.
+  await leaveToMenu(page, false);
+  await page.keyboard.press('Enter');
+  c = await carScreen(page);
+  check('the car-selection screen remembers V1 as selected', c.open && c.checked === 'v1');
+  await page.keyboard.press('ArrowRight');
+  check('arrow keys switch the car', (await carScreen(page)).checked === 'sports');
+  await page.keyboard.press('Enter');
+  await drive(page, 0.5);
+  check('Enter starts the race with the New Sports Car', (await state(page)).mode === 'race' && (await state(page)).carLook === 'sports');
+  await checkRaceCars(page, 'sports', 'race with the sports car');
+  await page.screenshot({ path: path.join(OUT, 'car-select-3-race-sports.png') });
+
+  // Same physics: from a standstill on the grid, both cars reach the same speed in the same time.
+  await leaveToMenu(page, false);
+  await page.keyboard.press('KeyF');
+  await drive(page, 1);
+  check('Free Drive now uses the sports car', (await state(page)).carModels.player.kind === 'model');
+  await page.keyboard.down('ArrowUp');
+  await drive(page, 3);
+  const sportsSpeed = (await state(page)).speedKmh;
+  await page.keyboard.up('ArrowUp');
+  check('both cars drive the same (same physics)', Math.abs(v1Speed - sportsSpeed) < 3, `after 3 s: V1 ${v1Speed.toFixed(1)} km/h, sports car ${sportsSpeed.toFixed(1)} km/h`);
+
+  // Close and reopen the game: the choice is remembered.
+  await page.reload();
+  await page.waitForFunction(() => window.__game && window.__game.ready && !document.querySelector('#mode-race').closest('[hidden]'), null, { timeout: 120000 });
+  c = await carScreen(page);
+  check('after reopening: the sports car is remembered', c.saved === 'sports' && c.shown === 'model', JSON.stringify(c));
+  await page.locator('#mode-race').click();
+  check('after reopening: the selection screen shows the sports car selected', (await carScreen(page)).checked === 'sports');
+  await page.keyboard.press('Escape');
+  check('Esc goes back to the main menu', !(await carScreen(page)).open && (await visible('#mode-buttons')));
+  check('no errors in the browser console', errors.length === 0, errors.join(' | '));
+  await context.close();
+
+  // A browser that blocks saving: still starts with V1 and still lets you choose.
+  console.log('\n— Car selection when the browser blocks saving —');
+  const blocked = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  await blocked.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } });
+  });
+  const bp = await blocked.newPage();
+  const berrors = [];
+  bp.on('pageerror', (e) => berrors.push(e.message));
+  await bp.goto(URL + '?laps=2');
+  await bp.waitForFunction(() => window.__game && window.__game.ready, null, { timeout: 60000 });
+  await bp.waitForFunction(() => !document.querySelector('#mode-race').closest('[hidden]'), null, { timeout: 60000 });
+  check('blocked storage: V1 by default', (await carScreen(bp)).shown === 'v1');
+  await startRace(bp, 'click', 'sports');
+  await sleep(500);
+  check('blocked storage: choosing the sports car still works', (await state(bp)).carModels.player.kind === 'model' && (await state(bp)).mode === 'race');
+  check('blocked storage: no errors', berrors.length === 0, berrors.join(' | '));
+  await blocked.close();
+}
+
+/** The car-selection screen on iPhone sizes: fits, easy to tap, and both cars can be started by touch. */
+async function iphoneCarSelectTest(browser) {
+  console.log('\n— Car selection on iPhone (touch) —');
+  const screens = ['iPhone SE', 'iPhone SE landscape', 'iPhone 13', 'iPhone 13 landscape', 'iPhone 14 Pro Max', 'iPhone 14 Pro Max landscape'];
+  for (const name of screens) {
+    const { context, page, errors } = await openGame(browser, devices[name]);
+    const file = name.replace(/\s+/g, '-');
+    await page.locator('#mode-race').tap();
+    await sleep(300);
+    const vp = page.viewportSize();
+    const parts = await page.locator('#car-select .btn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
+    const logo = await page.locator('.logo').boundingBox();
+    const problems = [];
+    if (parts.length !== 4) problems.push(`${parts.length} buttons`);
+    for (const r of parts) {
+      if (r.x < 0 || r.y < 0 || r.x + r.w > vp.width + 0.5 || r.y + r.h > vp.height + 0.5) problems.push('a button goes off screen');
+      if (r.h < 44) problems.push(`a button is only ${Math.round(r.h)} px tall`);
+      if (logo && r.y < logo.y + logo.height) problems.push('buttons overlap the logo');
+    }
+    // Room left for the car between the logo and the buttons.
+    const top = Math.min(...parts.map((r) => r.y));
+    const gap = top - (logo ? logo.y + logo.height : 0);
+    if (gap < 70) problems.push(`only ${Math.round(gap)} px left for the car`);
+    await page.screenshot({ path: path.join(OUT, `car-select-${file}.png`) });
+    check(`${name} (${vp.width}×${vp.height}): car selection fits, buttons easy to tap, room to see the car`, problems.length === 0, problems.join('; ') || `${Math.round(gap)} px for the car`);
+    if (name === 'iPhone SE' || name === 'iPhone 13 landscape') {
+      await page.locator('.car-option[data-car="sports"]').tap();
+      await page.locator('#car-start').tap();
+      await sleep(800);
+      let s = await state(page);
+      check(`${name}: START RACE by touch with the sports car`, s.mode === 'race' && s.carModels.player.kind === 'model');
+      await leaveToMenu(page, true);
+      await page.locator('#mode-race').tap();
+      check(`${name}: sports car remembered as selected`, (await carScreen(page)).checked === 'sports');
+      await page.locator('.car-option[data-car="v1"]').tap();
+      await page.locator('#car-start').tap();
+      await sleep(800);
+      s = await state(page);
+      check(`${name}: START RACE by touch with V1`, s.mode === 'race' && s.carModels.player.kind === 'v1');
+      await page.screenshot({ path: path.join(OUT, `car-select-${file}-race-v1.png`) });
+    }
     check(`${name}: no errors in the browser console`, errors.length === 0, errors.join(' | '));
     await context.close();
   }
@@ -698,10 +914,10 @@ async function audioTest(browser) {
   check('sound settings panel closes', !(await page.locator('#sound-panel').isVisible()));
 
   // Start a race: sound switches on.
-  await page.locator('#mode-race').click();
+  await startRace(page, 'click');
   await drive(page, 0.3);
   let s = await state(page);
-  check('sound starts when the player taps RACE', s.audio.ready && s.audio.contextState === 'running', s.audio.contextState);
+  check('sound starts when the player starts the race', s.audio.ready && s.audio.contextState === 'running', s.audio.contextState);
   check('no music during the countdown', !s.audio.musicPlaying);
   const idleFrequency = s.audio.engineFrequency;
   const beepsBefore = s.audio.counts.beep; // the volume preview may have beeped once
@@ -910,7 +1126,7 @@ async function persistenceTest(browser) {
   check('panel says the saved settings were restored', a.storageStatus === 'restored' && (await tab.page.locator('#sound-save-status').textContent()).includes('restored'));
   await tab.page.locator('#sound-done').tap();
   const before = await stored(tab.page);
-  await tab.page.locator('#mode-race').tap(); // sound switches on
+  await startRace(tab.page, 'tap'); // sound switches on
   await sleep(500);
   a = (await state(tab.page)).audio;
   check(
@@ -1039,7 +1255,7 @@ async function iphoneTest(browser) {
   const server = await startServer();
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
-    const sections = { desktopTest, circuitTest, raceTest, pauseTest, miniMapTest, audioTest, sliderTest, persistenceTest, iphoneTest, iphoneRaceTest, iphonePauseTest, iphoneMiniMapTest, hudLayoutTest };
+    const sections = { desktopTest, circuitTest, raceTest, pauseTest, miniMapTest, carSelectTest, audioTest, sliderTest, persistenceTest, iphoneTest, iphoneRaceTest, iphonePauseTest, iphoneMiniMapTest, iphoneCarSelectTest, hudLayoutTest };
     // Run one section with e.g. ONLY=hudLayoutTest npm run test:e2e
     for (const [name, run] of Object.entries(sections)) {
       if (!process.env.ONLY || process.env.ONLY === name) await run(browser);
