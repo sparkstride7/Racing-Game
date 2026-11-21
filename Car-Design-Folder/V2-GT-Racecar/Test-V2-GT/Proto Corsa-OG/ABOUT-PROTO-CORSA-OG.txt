@@ -1,0 +1,38 @@
+PROTO CORSA-OG
+A V2 GT racecar design, approved and saved on 21 November 2026
+
+What it is
+  Proto Corsa-OG is the name given to the finished Revision 4 design of the
+  V2 GT racecar from the Test-V2-GT work area. That is the Fenders and
+  Quarter Panels version, Revision 4: Rounded Splitter Corners.
+
+  Every other file in this folder is an exact, unchanged copy of that
+  Revision 4 package (40 files). This note is the only file added.
+
+How the design was made (all starting from the original V2 GT racecar)
+  1. A diamond-mesh front grille.
+  2. Front fenders and rear quarter panels, with real wheel arches and
+     black wheel-well liners.
+  3. Smoothed fenders with a hip line over each wheel, and body-coloured
+     rocker panels with carbon blades underneath.
+  4. Lower rocker panels and lower front and rear bumpers. The splitter and
+     diffuser moved down with the bumpers.
+  5. Rounded front splitter corners.
+  README.txt describes Revision 4 and all its test results in full.
+
+Things to know about the copied files
+  - README.txt was written in the work area. Paths in it such as
+    "../Revision-3-..." and "../../Model/..." point to folders in that work
+    area. They are not part of this folder.
+  - Rebuilding the model: build_fenders_rev4.mjs builds the model from the
+    approved diamond-grille design, gt_racecar_v2_diamond_grille.glb. That
+    file is not in this folder. Run, in Source-Code:
+        node build_fenders_rev4.mjs <path to gt_racecar_v2_diamond_grille.glb> <output.glb>
+    The "npm run build" shortcut in package.json uses the work-area
+    location, so it will not find the file from here.
+  - The checks work from here as they are. In Source-Code, after
+    "npm install", run "npm run check-wheels", "npm run check-suspension",
+    "npm run check-bodywork" or "npm run check-ground". They test
+    ../Model/gt_racecar_v2_fenders_rev4.glb.
+  - render_previews.ts reads the models from their work-area locations.
+    The 30 images in Preview-Images were made with it.

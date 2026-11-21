@@ -1,9 +1,11 @@
 CAR DESIGN FOLDER
 Racing Game project - preserved car designs
-Created 20 November 2026 (EXOTIC_v10b added later the same day)
+Created 20 November 2026 (EXOTIC_v10b added later the same day;
+Proto Corsa-OG added 21 November 2026)
 
-This folder keeps six car designs from the Racing Game's development history,
+This folder keeps seven car designs from the Racing Game's development history,
 each in its own folder, so they can be opened, studied or reused later.
+(Proto Corsa-OG is inside V2-GT-Racecar/Test-V2-GT.)
 
 All files are unchanged copies. The originals were left exactly where they were.
 Original filenames are kept (the one exception is the V2 file, see below).
@@ -24,7 +26,7 @@ About the preview images
   development. No new renders were added.
   Original preview images found: V1 9, V2-GT-Racecar 4, V4-Exotic 57,
   V4-GT-Racecar 57 (24 of these are the shared On-Circuit pictures),
-  EXOTIC_v10b 21, V10c 20.
+  EXOTIC_v10b 21, V10c 20, Proto Corsa-OG 30.
 
 
 ----------------------------------------------------------------------
@@ -170,6 +172,45 @@ Preview-Images/  original images (18 November, 20:03 to 21:43)
   EXOTIC_v10b_vs_v10c.png                  comparison: v10b vs v10c
   EXOTIC_v10c_vs_v10dd.png                 comparison: v10c vs v10dd
   No colour variations were made for v10c (it was only shown in red).
+
+
+----------------------------------------------------------------------
+V2-GT-Racecar/Test-V2-GT/Proto Corsa-OG/   Proto Corsa-OG
+----------------------------------------------------------------------
+Version:   Proto Corsa-OG (20 November 2026), the V2 GT racecar redesigned
+           in the Test-V2-GT area. It is Revision 4 of the "Fenders and
+           Quarter Panels" version (Revision 4: Rounded Splitter Corners).
+Design:    Starting from the original V2 GT:
+           - a diamond-mesh grille;
+           - front fenders and rear quarter panels with wheel arches and
+             wheel-well liners;
+           - smoothed fenders with a hip line over each wheel;
+           - lower body-coloured rocker panels with carbon blades;
+           - lower front and rear bumpers (the splitter and diffuser moved
+             down with them);
+           - rounded front splitter corners.
+Source:    Copied unchanged from the work area folder
+           Test-V2-GT/Fenders-and-Quarter-Panels-Version/
+           Revision-4-Rounded-Splitter-Corners (40 files).
+           One note was added: ABOUT-PROTO-CORSA-OG.txt.
+GitHub:    Added to this folder on 21 November 2026.
+Details:   Proto Corsa-OG has its own README.txt, which gives every change
+           and test result, and ABOUT-PROTO-CORSA-OG.txt.
+
+Model/gt_racecar_v2_fenders_rev4.glb   the 3D model (23,524 triangles)
+Source-Code/   build_fenders_rev4.mjs (builds the model from the
+               diamond-grille V2 GT design), the checks
+               check_wheel_clearance.mjs, check_suspension_travel.mjs,
+               check_ground_clearance.mjs, check_bodywork.mjs,
+               render_previews.ts, make_before_after.py, package.json
+
+Preview-Images/  30 images made during development (20 November)
+  gt_racecar_v2_fenders_rev4-*.png   20 views: front, rear, side, top, low
+                                     angles, four three-quarter views and
+                                     close-ups (splitter corners, bumpers,
+                                     fenders, rocker panels, steered wheels)
+  before-after-*.png                 10 comparisons: Revision 3 (left) and
+                                     this design (right)
 
 
 ----------------------------------------------------------------------
