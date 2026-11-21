@@ -1,0 +1,17 @@
+{
+  "name": "v2-gt-fenders-quarter-panels-rev4",
+  "private": true,
+  "type": "module",
+  "description": "Builds revision 4 of the V2 GT fenders and quarter panels (revision 3 + rounded splitter corners) from the diamond-grille design, and checks it.",
+  "scripts": {
+    "build": "node build_fenders_rev4.mjs ../../../Model/gt_racecar_v2_diamond_grille.glb ../Model/gt_racecar_v2_fenders_rev4.glb",
+    "check-wheels": "node check_wheel_clearance.mjs ../Model/gt_racecar_v2_fenders_rev4.glb 40",
+    "check-suspension": "node check_suspension_travel.mjs ../Model/gt_racecar_v2_fenders_rev4.glb 40",
+    "check-bodywork": "node check_bodywork.mjs ../Model/gt_racecar_v2_fenders_rev4.glb",
+    "check-ground": "node check_ground_clearance.mjs ../Model/gt_racecar_v2_fenders_rev4.glb"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "cdt2d": "1.0.0"
+  }
+}
