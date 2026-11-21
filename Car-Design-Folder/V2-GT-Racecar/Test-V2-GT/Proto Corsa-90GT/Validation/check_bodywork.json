@@ -1,0 +1,21 @@
+{
+ "shellTriangles": 13100,
+ "edgesUsedOnce": 0,
+ "edgesUsedMoreThanTwice": 0,
+ "partsCrossingTheShell": {
+  "Carbon_Undertray": 46,
+  "Front_Splitter": 5,
+  "Rear_Diffuser": 7,
+  "Headlamp_L": 10,
+  "Taillamp_L": 7,
+  "Headlamp_R": 7,
+  "Taillamp_R": 10,
+  "GT_Wing_Pylon_L": 8,
+  "Front_Canard_L": 8,
+  "GT_Wing_Pylon_R": 8,
+  "Front_Canard_R": 8,
+  "Seat_Silhouette_L": 8,
+  "Seat_Silhouette_R": 8,
+  "Front_Grille_Chrome_Surround": 32
+ }
+}

@@ -1,0 +1,1 @@
+Model/proto_corsa_90gt.glb errors 0, warnings 0, infos 0 

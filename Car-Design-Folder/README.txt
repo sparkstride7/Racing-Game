@@ -1,11 +1,11 @@
 CAR DESIGN FOLDER
 Racing Game project - preserved car designs
 Created 20 November 2026 (EXOTIC_v10b added later the same day;
-Proto Corsa-OG added 21 November 2026)
+Proto Corsa-OG and Proto Corsa-90GT added 21 November 2026)
 
-This folder keeps seven car designs from the Racing Game's development history,
+This folder keeps eight car designs from the Racing Game's development history,
 each in its own folder, so they can be opened, studied or reused later.
-(Proto Corsa-OG is inside V2-GT-Racecar/Test-V2-GT.)
+(Proto Corsa-OG and Proto Corsa-90GT are inside V2-GT-Racecar/Test-V2-GT.)
 
 All files are unchanged copies. The originals were left exactly where they were.
 Original filenames are kept (the one exception is the V2 file, see below).
@@ -26,7 +26,7 @@ About the preview images
   development. No new renders were added.
   Original preview images found: V1 9, V2-GT-Racecar 4, V4-Exotic 57,
   V4-GT-Racecar 57 (24 of these are the shared On-Circuit pictures),
-  EXOTIC_v10b 21, V10c 20, Proto Corsa-OG 30.
+  EXOTIC_v10b 21, V10c 20, Proto Corsa-OG 30, Proto Corsa-90GT 18.
 
 
 ----------------------------------------------------------------------
@@ -211,6 +211,41 @@ Preview-Images/  30 images made during development (20 November)
                                      fenders, rocker panels, steered wheels)
   before-after-*.png                 10 comparisons: Revision 3 (left) and
                                      this design (right)
+
+
+----------------------------------------------------------------------
+V2-GT-Racecar/Test-V2-GT/Proto Corsa-90GT/   Proto Corsa-90GT
+----------------------------------------------------------------------
+Version:   Proto Corsa-90GT (21 November 2026): Proto Corsa-OG with a new
+           front grille modelled on your reference photograph.
+Design:    The diamond mesh and thin chrome border are replaced by 45
+           straight, evenly spaced vertical polished-chrome bars in front of
+           the near-black grille recess, inside a substantial rounded chrome
+           surround that follows the Proto Corsa-OG grille opening.
+           Everything else is exactly as in Proto Corsa-OG.
+Source:    Copied unchanged from the work area folder
+           Test-V2-GT/Proto Corsa-90GT (36 files).
+GitHub:    Added to this folder on 21 November 2026.
+Details:   Proto Corsa-90GT has its own README.txt, which gives every change
+           and test result.
+
+Model/proto_corsa_90gt.glb   the 3D model (19,852 triangles)
+Source-Code/   build_proto_corsa_90gt.mjs (builds the model from the Proto
+               Corsa-OG model), the checks check_grille_fit.mjs,
+               check_bodywork.mjs, check_ground_clearance.mjs,
+               check_wheel_clearance.mjs, render_previews.ts,
+               make_before_after.py, package.json
+Validation/    the saved results of every check (validator, three.js
+               render, grille fit, bodywork, ground and wheel clearance,
+               parts compared with Proto Corsa-OG, build report)
+
+Preview-Images/  18 images made during development (21 November)
+  proto_corsa_90gt-*.png      11 views: front, front low angle, side, three
+                              three-quarter views and five grille close-ups
+  before-after-*.png          6 comparisons: Proto Corsa-OG (left) and this
+                              design (right)
+  reference-photo-vs-proto-corsa-90gt-grille.png
+                              your reference photograph beside the new grille
 
 
 ----------------------------------------------------------------------

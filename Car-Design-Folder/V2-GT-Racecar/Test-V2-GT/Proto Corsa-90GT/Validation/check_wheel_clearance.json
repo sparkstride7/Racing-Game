@@ -1,0 +1,34 @@
+{
+ "FL": {
+  "positionsTested": 408,
+  "steering": "±40°",
+  "crossings": 0,
+  "partsTouched": [],
+  "smallestGapMm": 14.4,
+  "closestPart": "Sculpted_Main_Body"
+ },
+ "FR": {
+  "positionsTested": 408,
+  "steering": "±40°",
+  "crossings": 0,
+  "partsTouched": [],
+  "smallestGapMm": 14.4,
+  "closestPart": "Sculpted_Main_Body"
+ },
+ "RL": {
+  "positionsTested": 24,
+  "steering": "none",
+  "crossings": 0,
+  "partsTouched": [],
+  "smallestGapMm": 23.8,
+  "closestPart": "Sculpted_Main_Body"
+ },
+ "RR": {
+  "positionsTested": 24,
+  "steering": "none",
+  "crossings": 0,
+  "partsTouched": [],
+  "smallestGapMm": 23.8,
+  "closestPart": "Sculpted_Main_Body"
+ }
+}

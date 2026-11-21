@@ -1,0 +1,10 @@
+three.js render check (three.js 0.187, GLTFLoader, in Chromium)
+
+The model loaded and rendered with no errors in 11 camera views (see Preview-Images).
+Parts the loader found: 19,852 triangles in total. Grille parts:
+  Front_Grille_Duct, Front_Grille_Back_Wall (the black recess, unchanged)
+  Front_Grille_Chrome_Surround, Front_Grille_Vertical_Bars (new)
+Proto Corsa-OG, loaded the same way for the comparisons: 23,524 triangles; grille parts
+  Front_Grille_Duct, Front_Grille_Back_Wall, Front_Grille_Diamond_Mesh_A,
+  Front_Grille_Diamond_Mesh_B, Front_Grille_Chrome_Border.
+Page errors: none.

@@ -1,0 +1,51 @@
+{
+ "bars": {
+  "allInsideOpening": true,
+  "smallestDistanceToOpeningEdgeMm": 1.5,
+  "allInsideRecess": true,
+  "frontOfBarsBehindFaceMm": 20,
+  "gapToBackWallMm": 24,
+  "againstOtherParts": {
+   "Sculpted_Main_Body": {
+    "crossings": 0,
+    "smallestGapMm": 20.2
+   },
+   "Front_Lower_Intake": {
+    "crossings": 0,
+    "smallestGapMm": 31.5
+   },
+   "Front_Grille_Duct": {
+    "crossings": 0,
+    "smallestGapMm": 1.5
+   },
+   "Front_Grille_Back_Wall": {
+    "crossings": 0,
+    "smallestGapMm": 24
+   },
+   "Front_Grille_Chrome_Surround": {
+    "crossings": 0,
+    "smallestGapMm": 8
+   }
+  }
+ },
+ "surround": {
+  "againstOtherParts": {
+   "Sculpted_Main_Body": {
+    "crossings": 32,
+    "smallestGapMm": 2.5
+   },
+   "Front_Grille_Duct": {
+    "crossings": 32,
+    "smallestGapMm": 1.5
+   },
+   "Front_Grille_Back_Wall": {
+    "crossings": 0,
+    "smallestGapMm": 48
+   },
+   "Front_Grille_Vertical_Bars": {
+    "crossings": 0,
+    "smallestGapMm": 8
+   }
+  }
+ }
+}
