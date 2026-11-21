@@ -1,0 +1,38 @@
+{
+ "lowestParts": [
+  {
+   "part": "Rocker_Blade_R",
+   "lowestPointMm": 268.5
+  },
+  {
+   "part": "Rocker_Blade_L",
+   "lowestPointMm": 268.5
+  },
+  {
+   "part": "Sculpted_Main_Body",
+   "lowestPointMm": 280
+  },
+  {
+   "part": "Rear_Diffuser",
+   "lowestPointMm": 280
+  },
+  {
+   "part": "Front_Splitter",
+   "lowestPointMm": 297.5
+  },
+  {
+   "part": "Carbon_Undertray",
+   "lowestPointMm": 340
+  }
+ ],
+ "anyPartBelowGround": false,
+ "approachAngleDeg": 15.5,
+ "departureAngleDeg": 15.5,
+ "rampAngleDeg": 23.3,
+ "lowestPointMmWithBodyTipped": {
+  "nose down 2°": 214.7,
+  "nose up 2°": 199.4,
+  "roll left 3°": 216,
+  "roll right 3°": 216
+ }
+}

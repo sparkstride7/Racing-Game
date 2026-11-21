@@ -1,0 +1,16 @@
+{
+  "name": "proto-corsa-90gt",
+  "private": true,
+  "type": "module",
+  "description": "Builds Proto Corsa-90GT (Proto Corsa-OG with a vertical-bar chrome grille) and checks it.",
+  "scripts": {
+    "build": "node build_proto_corsa_90gt.mjs \"../../Proto Corsa-OG/Model/gt_racecar_v2_fenders_rev4.glb\" ../Model/proto_corsa_90gt.glb",
+    "check-grille": "node check_grille_fit.mjs ../Model/proto_corsa_90gt.glb",
+    "check-bodywork": "node check_bodywork.mjs ../Model/proto_corsa_90gt.glb",
+    "check-ground": "node check_ground_clearance.mjs ../Model/proto_corsa_90gt.glb",
+    "check-wheels": "node check_wheel_clearance.mjs ../Model/proto_corsa_90gt.glb 40"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "4.5.1"
+  }
+}

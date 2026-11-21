@@ -1,0 +1,4 @@
+Sculpted_Main_Body: 11638 of 11638 original triangles kept exactly; 0 replaced; new body triangles 11638
+other original parts identical (shape, position, material): 73 of 76; differences: missing Front_Grille_Diamond_Mesh_A, missing Front_Grille_Diamond_Mesh_B, missing Front_Grille_Chrome_Border
+original materials unchanged: 12 of 14; new materials: Grille_Polished_Chrome
+new parts: Front_Grille_Chrome_Surround, Front_Grille_Vertical_Bars
