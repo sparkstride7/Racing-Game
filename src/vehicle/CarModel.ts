@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CAR } from '../config';
+import type { CarBody } from './carAssets';
 
 /**
  * A sports car built entirely from code (no downloaded art), so it is 100% original.
@@ -36,7 +37,7 @@ export interface CarStyle {
   /** Race number shown on the roof and doors. */
   number?: number;
   /** Which 3D car model to use when the model files are loaded (the built-in car is used otherwise). */
-  body?: 'exotic' | 'gt';
+  body?: CarBody;
 }
 
 /** The player's original car. */

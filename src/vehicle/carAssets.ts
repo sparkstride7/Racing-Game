@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
-/** The two 3D car models. Which one a car uses is chosen by its style (`CarStyle.body`). */
-export type CarBody = 'exotic' | 'gt';
+/** The 3D car models. Which one a car uses is chosen by its style (`CarStyle.body`). */
+export type CarBody = 'exotic' | 'gt' | 'volt';
 
 /** One loaded car model: its three detail levels, ready to be copied for each car. */
 export interface CarTemplate {

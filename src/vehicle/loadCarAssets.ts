@@ -7,10 +7,12 @@ import { clearCarTemplates, setCarTemplate, type CarBody } from './carAssets';
 
 /**
  * Model files in public/models/cars/ (compressed with Meshopt, so the Meshopt decoder is required).
- * All six cars currently use the Exotic body (design exotic-v10dd). The GT body will return in a later update.
+ * Five cars use the Exotic body (design exotic-v10dd); Volt (#11) uses the VOLT GT body (approved Revision 3.6).
+ * The GT body will return in a later update.
  */
 const FILES: Partial<Record<CarBody, string>> = {
   exotic: 'optimized_exotic_supercar_v10dd',
+  volt: 'optimized_volt_gt_rev3_6',
 };
 
 /** Every model must have these nodes: steering pivots, rolling wheels and brake calipers. */
@@ -23,14 +25,18 @@ const RIG = ['FL', 'FR', 'RL', 'RR'].flatMap((c) => [`Wheel_${c}`, `Wheel_${c}_S
  * Where the race-number roundels go on each body (car space, metres): one on the roof, one on each door.
  * Chosen on painted areas, clear of windows, vents and the GT's roof scoop.
  */
-const NUMBER_SPOTS: Record<CarBody, { roof: [number, number]; door: [number, number]; doorZ: [number, number]; roofSize: number; doorSize: number }> = {
+// `top: 'bonnet'` puts the top number on the bonnet instead of the roof (roof = [x, z] of its centre there), laid along
+// the bonnet's own slope; used by the VOLT GT, whose roof is glass.
+const NUMBER_SPOTS: Record<CarBody, { roof: [number, number]; door: [number, number]; doorZ: [number, number]; roofSize: number; doorSize: number; top?: 'roof' | 'bonnet' }> = {
   // Door roundels go on the flattest part of the door within doorZ (clear of the side intake and wheel arches).
   exotic: { roof: [0, 0.05], door: [0.5, 0.35], doorZ: [0.1, 0.45], roofSize: 0.42, doorSize: 0.34 },
+  // VOLT GT: number 11 on both doors and on the bonnet (middle of the bonnet, z 1.6 m); the glass roof stays clear.
+  volt: { roof: [0, 1.6], door: [0.5, 0.35], doorZ: [0.1, 0.45], roofSize: 0.42, doorSize: 0.34, top: 'bonnet' },
   gt: { roof: [0, 0.32], door: [0.5, 0.1], doorZ: [-0.25, 0.1], roofSize: 0.38, doorSize: 0.34 },
 };
 
 /**
- * Loads both car models (all three detail levels) once at start-up.
+ * Loads the car models (all three detail levels of each) once at start-up.
  * Returns false, and leaves the built-in car in use, if anything is missing, fails to load,
  * or takes longer than `timeoutMs` (a late download is then ignored).
  */
@@ -130,6 +136,16 @@ function buildNumberGeometry(scene: THREE.Object3D, body: CarBody) {
     return d;
   };
   const roof = hit(new THREE.Vector3(spot.roof[0], 3, spot.roof[1]), new THREE.Vector3(0, -1, 0));
+  // On a bonnet: its surface direction, from nearby surface points (as for the doors), so the number lies flat on it.
+  let topNormal = new THREE.Vector3(0, 1, 0);
+  if (spot.top === 'bonnet') {
+    const at = (x: number, z: number) => hit(new THREE.Vector3(x, 3, z), new THREE.Vector3(0, -1, 0));
+    const d = spot.roofSize / 2;
+    const tx = at(spot.roof[0] + d, spot.roof[1]).sub(at(spot.roof[0] - d, spot.roof[1]));
+    const tz = at(spot.roof[0], spot.roof[1] + d).sub(at(spot.roof[0], spot.roof[1] - d));
+    topNormal = new THREE.Vector3().crossVectors(tz, tx).normalize();
+    if (topNormal.y < 0) topNormal.negate();
+  }
   // The door's real surface direction, from nearby surface points, so the roundel is projected straight onto
   // the panel (no stretching on a curved door); the flattest spot in range is chosen.
   const doorAt = (side: number, y: number, z: number) => {
@@ -151,7 +167,8 @@ function buildNumberGeometry(scene: THREE.Object3D, body: CarBody) {
   const left = door(1), right = door(-1);
   const parts = [
     // Roof: reads correctly from the chase camera behind the car (text "up" points forward).
-    decal(roof, new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), spot.roofSize),
+    // Bonnet: along the bonnet's surface, readable from in front of the car (tops of the digits towards the windscreen).
+    decal(roof, topNormal, new THREE.Vector3(0, 0, spot.top === 'bonnet' ? -1 : 1), spot.roofSize),
     decal(left.point, left.n, new THREE.Vector3(0, 1, 0), spot.doorSize),
     decal(right.point, right.n, new THREE.Vector3(0, 1, 0), spot.doorSize),
   ];

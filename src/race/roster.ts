@@ -39,7 +39,7 @@ export const OPPONENTS: Opponent[] = [
   {
     name: 'Volt',
     colorName: 'Yellow',
-    style: { paint: 0xffc400, accent: 0x15171a, wing: 'none', rim: 0x15171a, caliper: 0x15171a, finish: 'gloss', number: 11, body: 'exotic' },
+    style: { paint: 0xffc400, accent: 0x15171a, wing: 'none', rim: 0x15171a, caliper: 0x15171a, finish: 'gloss', number: 11, body: 'volt' },
     skill: { cornerGrip: 18, braking: 9, lane: -0.8 },
   },
   {
